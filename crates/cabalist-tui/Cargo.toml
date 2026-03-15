@@ -1,0 +1,29 @@
+[package]
+name = "cabalist-tui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Interactive TUI for managing Haskell .cabal files"
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[[bin]]
+name = "cabalist"
+path = "src/main.rs"
+
+[dependencies]
+cabalist-parser = { path = "../cabalist-parser" }
+cabalist-ghc = { path = "../cabalist-ghc" }
+cabalist-hackage = { path = "../cabalist-hackage" }
+cabalist-opinions = { path = "../cabalist-opinions" }
+cabalist-cabal = { path = "../cabalist-cabal" }
+ratatui = "0.29"
+crossterm = "0.28"
+clap = { version = "4", features = ["derive"] }
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow = "1"

@@ -1,0 +1,19 @@
+[package]
+name = "cabalist-ghc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "GHC extensions, warnings, and version knowledge base"
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[dependencies]
+serde.workspace = true
+toml = "0.8"
+once_cell = "1"
+
+[dev-dependencies]
+pretty_assertions = "1"

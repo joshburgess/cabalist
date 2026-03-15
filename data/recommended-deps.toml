@@ -1,0 +1,149 @@
+[category.json]
+name = "JSON"
+recommended = "aeson"
+alternatives = ["json", "jsonifier"]
+note = "aeson is the de facto standard; extremely well-maintained"
+
+[category.http-client]
+name = "HTTP Client"
+recommended = "http-client"
+companions = ["http-client-tls", "http-types"]
+alternatives = ["req", "wreq"]
+note = "http-client is low-level but composable; req wraps it for simple cases"
+
+[category.testing]
+name = "Testing"
+recommended = "tasty"
+companions = ["tasty-hunit", "tasty-quickcheck", "tasty-golden"]
+alternatives = ["hspec", "sydtest"]
+note = "tasty's architecture supports multiple test providers cleanly"
+
+[category.text]
+name = "Text"
+recommended = "text"
+alternatives = []
+note = "The standard text type; included with GHC"
+
+[category.cli]
+name = "CLI Argument Parsing"
+recommended = "optparse-applicative"
+alternatives = ["cmdargs"]
+note = "optparse-applicative is the community standard for CLI parsing with excellent help generation"
+
+[category.bytestring]
+name = "ByteString"
+recommended = "bytestring"
+alternatives = []
+note = "The standard byte array type; included with GHC"
+
+[category.containers]
+name = "Containers"
+recommended = "containers"
+companions = ["unordered-containers", "hashable"]
+alternatives = []
+note = "containers provides Map, Set, etc.; unordered-containers adds HashMap and HashSet"
+
+[category.streaming]
+name = "Streaming"
+recommended = "streaming"
+alternatives = ["conduit", "pipes", "streamly"]
+note = "streaming is simple and composable; conduit has a larger ecosystem for IO-heavy work"
+
+[category.logging]
+name = "Logging"
+recommended = "co-log"
+alternatives = ["monad-logger", "katip", "fast-logger"]
+note = "co-log is well-typed and composable; monad-logger is simpler but less flexible"
+
+[category.database]
+name = "Database"
+recommended = "persistent"
+companions = ["persistent-sqlite", "persistent-postgresql", "esqueleto"]
+alternatives = ["hasql", "postgresql-simple", "sqlite-simple", "beam"]
+note = "persistent provides type-safe database access with multiple backends; hasql is faster for PostgreSQL-specific work"
+
+[category.web-framework]
+name = "Web Framework"
+recommended = "servant"
+companions = ["servant-server", "servant-client", "warp"]
+alternatives = ["scotty", "yesod", "IHP"]
+note = "servant uses type-level programming for API specifications; scotty is simpler for small services"
+
+[category.concurrency]
+name = "Concurrency"
+recommended = "async"
+companions = ["stm"]
+alternatives = ["unliftio"]
+note = "async provides structured concurrency primitives; stm provides composable transactional memory"
+
+[category.file-path]
+name = "File Paths"
+recommended = "filepath"
+alternatives = ["path", "path-io"]
+note = "filepath is in the GHC boot libraries; path adds type-safe absolute/relative distinction"
+
+[category.time]
+name = "Time"
+recommended = "time"
+alternatives = ["chronos", "thyme"]
+note = "time is the standard time library, well-maintained and comprehensive"
+
+[category.crypto]
+name = "Cryptography"
+recommended = "crypton"
+companions = ["crypton-x509"]
+alternatives = ["cryptonite"]
+note = "crypton is the actively maintained fork of cryptonite with security fixes"
+
+[category.yaml]
+name = "YAML / Config"
+recommended = "yaml"
+companions = ["aeson"]
+alternatives = ["tomland", "dhall"]
+note = "yaml is built on aeson and libyaml; tomland provides TOML support"
+
+[category.property-testing]
+name = "Property Testing"
+recommended = "QuickCheck"
+companions = ["quickcheck-instances"]
+alternatives = ["hedgehog"]
+note = "QuickCheck is the original property testing library; hedgehog has integrated shrinking"
+
+[category.serialization]
+name = "Binary Serialization"
+recommended = "binary"
+alternatives = ["cereal", "serialise", "store", "flat"]
+note = "binary is simple and widely used; store is faster but less portable"
+
+[category.pretty-printing]
+name = "Pretty Printing"
+recommended = "prettyprinter"
+alternatives = ["pretty"]
+note = "prettyprinter (formerly ansi-wl-pprint) is the modern choice with ANSI color support"
+
+[category.regex]
+name = "Regular Expressions"
+recommended = "regex-tdfa"
+alternatives = ["pcre-heavy", "regex-applicative"]
+note = "regex-tdfa is pure Haskell with POSIX semantics; pcre-heavy wraps the C PCRE library"
+
+[category.lens]
+name = "Optics"
+recommended = "optics"
+companions = ["optics-core", "optics-th"]
+alternatives = ["lens", "microlens"]
+note = "optics is a modern redesign with better type errors; lens has a larger ecosystem"
+
+[category.mtl]
+name = "Effect Systems / Monad Transformers"
+recommended = "mtl"
+companions = ["transformers"]
+alternatives = ["effectful", "polysemy", "fused-effects", "bluefin"]
+note = "mtl is the classic approach; effectful offers better performance with an IO-based approach"
+
+[category.parser]
+name = "Parsing"
+recommended = "megaparsec"
+companions = ["parser-combinators"]
+alternatives = ["attoparsec", "parsec", "flatparse"]
+note = "megaparsec has excellent error messages; attoparsec is faster for bytestring parsing"

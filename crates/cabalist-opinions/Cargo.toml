@@ -1,0 +1,23 @@
+[package]
+name = "cabalist-opinions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Opinionated lints, defaults, templates, and configuration"
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[dependencies]
+cabalist-parser = { path = "../cabalist-parser" }
+cabalist-ghc = { path = "../cabalist-ghc" }
+cabalist-hackage = { path = "../cabalist-hackage" }
+serde.workspace = true
+thiserror.workspace = true
+toml = "0.8"
+once_cell = "1"
+
+[dev-dependencies]
+pretty_assertions = "1"

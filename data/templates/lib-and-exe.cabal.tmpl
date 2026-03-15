@@ -1,0 +1,53 @@
+cabal-version: 3.0
+name:          {{name}}
+version:       0.1.0.0
+synopsis:      {{synopsis}}
+description:   {{description}}
+license:       {{license}}
+license-file:  LICENSE
+author:        {{author}}
+maintainer:    {{maintainer}}
+category:      {{category}}
+build-type:    Simple
+
+extra-doc-files:
+    CHANGELOG.md
+    README.md
+
+source-repository head
+    type:     git
+    location: {{repo-url}}
+
+common warnings
+    ghc-options:
+        -Wall
+        -Wcompat
+        -Widentities
+        -Wincomplete-record-updates
+        -Wincomplete-uni-patterns
+        -Wmissing-deriving-strategies
+        -Wredundant-constraints
+        -Wunused-packages
+
+library
+    import:           warnings
+    exposed-modules:  {{exposed-modules}}
+    build-depends:
+        base ^>=4.17
+    hs-source-dirs:   src
+    default-language: {{language}}
+    default-extensions:
+        OverloadedStrings
+        DerivingStrategies
+
+executable {{name}}
+    import:           warnings
+    main-is:          Main.hs
+    build-depends:
+        base ^>=4.17
+      , {{name}}
+    hs-source-dirs:   app
+    default-language: {{language}}
+    default-extensions:
+        OverloadedStrings
+        DerivingStrategies

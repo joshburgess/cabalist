@@ -1,0 +1,1048 @@
+# GHC Language Extensions Database
+# Each entry documents a GHC language extension with metadata.
+#
+# Fields:
+#   name        - The extension name as used in {-# LANGUAGE ... #-} or .cabal files
+#   since       - The GHC version that introduced the extension
+#   description - A brief human-readable description
+#   category    - Classification for grouping/filtering
+#   safe        - Whether it's generally safe to enable project-wide
+#   recommended - Whether cabalist recommends it as a default
+#   warn        - Optional warning note for extensions with gotchas
+
+# ──────────────────────────────────────────────────────────────
+# Strings & Overloading
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "OverloadedStrings"
+since = "6.8.1"
+description = "String literals are polymorphic over IsString, allowing Text and ByteString literals"
+category = "strings"
+safe = true
+recommended = true
+
+[[extension]]
+name = "OverloadedLabels"
+since = "8.0.1"
+description = "Enable the #label syntax for overloaded labels via the IsLabel class"
+category = "strings"
+safe = true
+recommended = false
+
+[[extension]]
+name = "OverloadedLists"
+since = "7.8.1"
+description = "List literals are polymorphic over IsList, allowing Vector and Map literals"
+category = "strings"
+safe = true
+recommended = false
+warn = "Can make type inference less predictable for list expressions"
+
+[[extension]]
+name = "OverloadedRecordDot"
+since = "9.2.1"
+description = "Access record fields with dot syntax: record.field"
+category = "records"
+safe = true
+recommended = false
+
+[[extension]]
+name = "OverloadedRecordUpdate"
+since = "9.2.1"
+description = "Update record fields with dot syntax: record { field = value }"
+category = "records"
+safe = false
+recommended = false
+warn = "Experimental; may change in future GHC versions"
+
+# ──────────────────────────────────────────────────────────────
+# Deriving
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "DerivingStrategies"
+since = "8.2.1"
+description = "Require explicit deriving strategy annotations (stock, newtype, anyclass, via)"
+category = "deriving"
+safe = true
+recommended = true
+
+[[extension]]
+name = "DerivingVia"
+since = "8.6.1"
+description = "Derive instances by specifying a representationally equal type to derive via"
+category = "deriving"
+safe = true
+recommended = false
+
+[[extension]]
+name = "DeriveGeneric"
+since = "7.2.1"
+description = "Allow automatic deriving of Generic instances"
+category = "deriving"
+safe = true
+recommended = true
+
+[[extension]]
+name = "DeriveAnyClass"
+since = "7.10.1"
+description = "Allow deriving any class that has a default implementation via Generic"
+category = "deriving"
+safe = true
+recommended = true
+
+[[extension]]
+name = "DeriveFunctor"
+since = "6.8.1"
+description = "Allow automatic deriving of Functor instances"
+category = "deriving"
+safe = true
+recommended = true
+
+[[extension]]
+name = "DeriveFoldable"
+since = "7.10.1"
+description = "Allow automatic deriving of Foldable instances"
+category = "deriving"
+safe = true
+recommended = true
+
+[[extension]]
+name = "DeriveTraversable"
+since = "7.10.1"
+description = "Allow automatic deriving of Traversable instances"
+category = "deriving"
+safe = true
+recommended = true
+
+[[extension]]
+name = "DeriveDataTypeable"
+since = "6.8.1"
+description = "Allow automatic deriving of Data and Typeable instances"
+category = "deriving"
+safe = true
+recommended = false
+
+[[extension]]
+name = "DeriveLift"
+since = "8.0.1"
+description = "Allow automatic deriving of the Lift class for Template Haskell"
+category = "deriving"
+safe = true
+recommended = false
+
+[[extension]]
+name = "GeneralizedNewtypeDeriving"
+since = "6.8.1"
+description = "Allow deriving instances for newtypes by reusing the underlying type's instance"
+category = "deriving"
+safe = true
+recommended = true
+
+[[extension]]
+name = "StandaloneDeriving"
+since = "6.8.1"
+description = "Allow deriving instances separately from the data type declaration"
+category = "deriving"
+safe = true
+recommended = false
+
+[[extension]]
+name = "EmptyDataDeriving"
+since = "8.4.1"
+description = "Allow deriving instances for empty data types"
+category = "deriving"
+safe = true
+recommended = false
+
+[[extension]]
+name = "AutoDeriveTypeable"
+since = "7.8.1"
+description = "Automatically derive Typeable for all data types"
+category = "deriving"
+safe = true
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Types & Kinds
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "TypeApplications"
+since = "8.0.1"
+description = "Allow explicit type application with @Type syntax"
+category = "types"
+safe = true
+recommended = true
+
+[[extension]]
+name = "ScopedTypeVariables"
+since = "6.8.1"
+description = "Allow lexically-scoped type variables bound by forall"
+category = "types"
+safe = true
+recommended = true
+
+[[extension]]
+name = "DataKinds"
+since = "7.4.1"
+description = "Promote data constructors to the type level"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "TypeFamilies"
+since = "6.10.1"
+description = "Allow type-level functions (type families) and associated types"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "TypeFamilyDependencies"
+since = "8.0.1"
+description = "Allow injective type families (type family with result annotation)"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "GADTs"
+since = "6.8.1"
+description = "Generalized Algebraic Data Types with explicit type signatures on constructors"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "GADTSyntax"
+since = "7.2.1"
+description = "Allow GADT-style syntax for data type declarations without full GADT power"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "RankNTypes"
+since = "6.8.1"
+description = "Allow polymorphism in function argument positions (higher-rank types)"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "ExistentialQuantification"
+since = "6.8.1"
+description = "Allow existentially quantified type variables in data type declarations"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "ConstraintKinds"
+since = "7.4.1"
+description = "Allow constraints to be used as first-class types of kind Constraint"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "MultiParamTypeClasses"
+since = "6.8.1"
+description = "Allow type classes with multiple type parameters"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "FunctionalDependencies"
+since = "6.8.1"
+description = "Allow functional dependencies in multi-parameter type classes"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "FlexibleInstances"
+since = "6.8.1"
+description = "Allow more flexible instance declarations than Haskell 98 allows"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "FlexibleContexts"
+since = "6.8.1"
+description = "Allow more flexible class constraints in type signatures"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "UndecidableInstances"
+since = "6.8.1"
+description = "Allow instance declarations that may not terminate during type checking"
+category = "types"
+safe = false
+recommended = false
+warn = "Can cause the type checker to loop; use only when necessary"
+
+[[extension]]
+name = "TypeOperators"
+since = "6.8.1"
+description = "Allow type-level operators (type names starting with a symbol)"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "PolyKinds"
+since = "7.4.1"
+description = "Allow kind polymorphism, generalizing types to be polymorphic in their kind"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "KindSignatures"
+since = "6.8.1"
+description = "Allow explicit kind signatures on type variables and type declarations"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "StandaloneKindSignatures"
+since = "8.10.1"
+description = "Allow standalone kind signatures for type declarations (type Foo :: Type -> Type)"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "TypeSynonymInstances"
+since = "6.8.1"
+description = "Allow type synonyms in instance heads"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "StarIsType"
+since = "8.6.1"
+description = "Treat * as a synonym for Type (the kind of types)"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "AllowAmbiguousTypes"
+since = "7.8.1"
+description = "Allow type class constraints that cannot be resolved from the type alone"
+category = "types"
+safe = false
+recommended = false
+warn = "Requires TypeApplications to use ambiguous functions; can mask real type errors"
+
+[[extension]]
+name = "RoleAnnotations"
+since = "7.8.1"
+description = "Allow explicit role annotations on type parameters (nominal, representational, phantom)"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "TypeAbstractions"
+since = "9.8.1"
+description = "Allow type abstraction syntax in patterns and lambda expressions"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "ExplicitForAll"
+since = "6.12.1"
+description = "Allow explicit forall quantification in type signatures"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "ExplicitNamespaces"
+since = "7.6.1"
+description = "Allow the type keyword in import/export lists to disambiguate types from terms"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "LiberalTypeSynonyms"
+since = "6.8.1"
+description = "Allow type synonyms to be used in more places, including partially applied"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "LinearTypes"
+since = "9.0.1"
+description = "Allow linear function types (a %1 -> b) for resource tracking"
+category = "types"
+safe = false
+recommended = false
+warn = "Experimental feature; API may change across GHC versions"
+
+[[extension]]
+name = "QuantifiedConstraints"
+since = "8.6.1"
+description = "Allow universally quantified constraints (forall a. C a => ...)"
+category = "constraints"
+safe = true
+recommended = false
+
+[[extension]]
+name = "ImpredicativeTypes"
+since = "6.10.1"
+description = "Allow impredicative polymorphism (polymorphic types in non-prenex positions)"
+category = "types"
+safe = false
+recommended = false
+warn = "Historically fragile; significantly improved in GHC 9.2+ with Quick Look"
+
+# ──────────────────────────────────────────────────────────────
+# Syntax
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "LambdaCase"
+since = "7.6.1"
+description = "Allow \\case syntax as shorthand for \\x -> case x of"
+category = "syntax"
+safe = true
+recommended = true
+
+[[extension]]
+name = "BlockArguments"
+since = "8.6.1"
+description = "Allow do, case, if, let, and lambda in function argument position without $"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "MultiWayIf"
+since = "7.6.1"
+description = "Allow multi-way if expressions with guards (if | cond1 -> ...; | cond2 -> ...)"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "ImportQualifiedPost"
+since = "8.10.1"
+description = "Allow writing 'import M qualified' instead of 'import qualified M'"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "PostfixOperators"
+since = "7.10.1"
+description = "Allow postfix operator syntax via operator sections"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "TupleSections"
+since = "6.12.1"
+description = "Allow tuple sections like (,x) as shorthand for \\a -> (a, x)"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "EmptyCase"
+since = "7.8.1"
+description = "Allow empty case expressions (case x of {})"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "DoAndIfThenElse"
+since = "7.0.1"
+description = "Allow if-then-else without semicolons in do blocks (Haskell 2010 behavior)"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "ApplicativeDo"
+since = "8.0.1"
+description = "Desugar do-notation to Applicative operations where possible"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "QualifiedDo"
+since = "9.0.1"
+description = "Allow qualified do-notation (M.do { ... }) for module-specific bind/return"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "MonadComprehensions"
+since = "7.2.1"
+description = "Generalize list comprehensions to work with any MonadPlus"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "ParallelListComp"
+since = "6.8.1"
+description = "Allow parallel list comprehension syntax using | separator"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "TransformListComp"
+since = "6.10.1"
+description = "Allow SQL-like syntax in list comprehensions (group by, using, then)"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "Arrows"
+since = "6.8.1"
+description = "Allow arrow notation (proc) for composing computations in the Arrow abstraction"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "RecursiveDo"
+since = "6.8.1"
+description = "Allow recursive bindings in do-notation via mdo or rec keywords"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "NegativeLiterals"
+since = "7.8.1"
+description = "Treat -123 as a literal instead of negate applied to 123"
+category = "syntax"
+safe = true
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Numeric & Literals
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "BinaryLiterals"
+since = "7.10.1"
+description = "Allow binary integer literals (0b101010)"
+category = "numeric"
+safe = true
+recommended = false
+
+[[extension]]
+name = "NumericUnderscores"
+since = "8.6.1"
+description = "Allow underscores in numeric literals for readability (1_000_000)"
+category = "numeric"
+safe = true
+recommended = false
+
+[[extension]]
+name = "HexFloatLiterals"
+since = "8.4.1"
+description = "Allow hexadecimal floating-point literals (0x1.fp10)"
+category = "numeric"
+safe = true
+recommended = false
+
+[[extension]]
+name = "NumDecimals"
+since = "7.8.1"
+description = "Allow integer literals with decimal notation to be Fractional"
+category = "numeric"
+safe = true
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Patterns
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "BangPatterns"
+since = "6.8.1"
+description = "Allow ! in patterns to force evaluation (strict pattern matching)"
+category = "patterns"
+safe = true
+recommended = false
+
+[[extension]]
+name = "ViewPatterns"
+since = "6.10.1"
+description = "Allow view patterns (f -> pattern) in pattern matching positions"
+category = "patterns"
+safe = true
+recommended = false
+
+[[extension]]
+name = "PatternSynonyms"
+since = "7.8.1"
+description = "Allow user-defined pattern synonyms for abstracting over pattern matching"
+category = "patterns"
+safe = true
+recommended = false
+
+[[extension]]
+name = "PatternGuards"
+since = "6.8.1"
+description = "Allow pattern guards in case alternatives and function definitions"
+category = "patterns"
+safe = true
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Records
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "RecordWildCards"
+since = "6.8.1"
+description = "Allow .. syntax in record patterns and construction to bind/use all fields"
+category = "records"
+safe = true
+recommended = false
+warn = "Can make it unclear which names are in scope; prefer NamedFieldPuns for clarity"
+
+[[extension]]
+name = "NamedFieldPuns"
+since = "6.10.1"
+description = "Allow name punning in record patterns: Foo{bar} means Foo{bar=bar}"
+category = "records"
+safe = true
+recommended = false
+
+[[extension]]
+name = "DuplicateRecordFields"
+since = "8.0.1"
+description = "Allow multiple data types in the same module to share field names"
+category = "records"
+safe = true
+recommended = false
+warn = "Can cause ambiguity errors; works best with OverloadedRecordDot in GHC 9.2+"
+
+[[extension]]
+name = "NoFieldSelectors"
+since = "9.2.1"
+description = "Disable generation of record field selector functions to avoid name clashes"
+category = "records"
+safe = true
+recommended = false
+
+[[extension]]
+name = "DisambiguateRecordFields"
+since = "6.8.1"
+description = "Automatically disambiguate record field names when the type is known"
+category = "records"
+safe = true
+recommended = false
+
+[[extension]]
+name = "FieldSelectors"
+since = "9.2.1"
+description = "Control whether record field selector functions are generated (default: on)"
+category = "records"
+safe = true
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Strictness
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "StrictData"
+since = "8.0.1"
+description = "Make all data type fields strict by default (add ~ for lazy)"
+category = "strictness"
+safe = false
+recommended = false
+warn = "Changes evaluation semantics project-wide; can break lazy algorithms"
+
+[[extension]]
+name = "Strict"
+since = "8.0.1"
+description = "Make all bindings and patterns strict by default"
+category = "strictness"
+safe = false
+recommended = false
+warn = "Very invasive; changes the semantics of all code in the module"
+
+# ──────────────────────────────────────────────────────────────
+# Metaprogramming
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "TemplateHaskell"
+since = "6.0"
+description = "Compile-time metaprogramming via quasiquotation and splicing"
+category = "metaprogramming"
+safe = false
+recommended = false
+warn = "Increases compile times, makes cross-compilation harder, and creates stage restriction constraints"
+
+[[extension]]
+name = "TemplateHaskellQuotes"
+since = "8.0.1"
+description = "Allow Template Haskell quotes without requiring the full TemplateHaskell extension"
+category = "metaprogramming"
+safe = true
+recommended = false
+
+[[extension]]
+name = "QuasiQuotes"
+since = "6.10.1"
+description = "Allow quasiquotation syntax [name| ... |] for embedded DSLs"
+category = "metaprogramming"
+safe = true
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Unboxed & Low-level
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "UnboxedTuples"
+since = "6.8.1"
+description = "Allow unboxed tuple types (# a, b #) for performance-critical code"
+category = "unboxed"
+safe = false
+recommended = false
+warn = "Cannot be used in polymorphic contexts; primarily for GHC internals and performance tuning"
+
+[[extension]]
+name = "UnboxedSums"
+since = "8.2.1"
+description = "Allow unboxed sum types (# a | b #) for efficient tagged unions"
+category = "unboxed"
+safe = false
+recommended = false
+warn = "Low-level feature; primarily for GHC internals and performance tuning"
+
+[[extension]]
+name = "MagicHash"
+since = "6.8.1"
+description = "Allow # suffix on identifiers and literals for unboxed/primitive types"
+category = "unboxed"
+safe = false
+recommended = false
+warn = "Exposes GHC implementation details; rarely needed in application code"
+
+[[extension]]
+name = "UnliftedNewtypes"
+since = "8.10.1"
+description = "Allow newtypes to wrap unlifted types (types of non-standard kind)"
+category = "unboxed"
+safe = true
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Generics
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "DefaultSignatures"
+since = "7.2.1"
+description = "Allow default method signatures in class declarations with different constraints"
+category = "generics"
+safe = true
+recommended = false
+
+[[extension]]
+name = "InstanceSigs"
+since = "7.6.1"
+description = "Allow type signatures on instance method implementations"
+category = "generics"
+safe = true
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Modules & Imports
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "PackageImports"
+since = "6.10.1"
+description = "Allow specifying which package a module import comes from"
+category = "modules"
+safe = true
+recommended = false
+
+[[extension]]
+name = "ImplicitPrelude"
+since = "6.8.1"
+description = "Control whether the Prelude is implicitly imported (default: on)"
+category = "modules"
+safe = true
+recommended = false
+
+[[extension]]
+name = "NoImplicitPrelude"
+since = "6.8.1"
+description = "Disable the implicit import of the Prelude module"
+category = "modules"
+safe = true
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# FFI
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "ForeignFunctionInterface"
+since = "6.8.1"
+description = "Allow calling and being called by C code (Haskell FFI)"
+category = "ffi"
+safe = true
+recommended = false
+
+[[extension]]
+name = "CApiFFI"
+since = "7.6.1"
+description = "Allow FFI imports using the C API calling convention (capi)"
+category = "ffi"
+safe = true
+recommended = false
+
+[[extension]]
+name = "InterruptibleFFI"
+since = "7.2.1"
+description = "Allow foreign imports to be interrupted by asynchronous exceptions"
+category = "ffi"
+safe = true
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Constraints
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "ConstrainedClassMethods"
+since = "6.8.1"
+description = "Allow class methods to have additional constraints beyond the class constraint"
+category = "constraints"
+safe = true
+recommended = false
+
+[[extension]]
+name = "MonoLocalBinds"
+since = "6.12.1"
+description = "Disable let-generalisation for local bindings (implied by GADTs and TypeFamilies)"
+category = "constraints"
+safe = true
+recommended = false
+
+[[extension]]
+name = "MonomorphismRestriction"
+since = "6.8.1"
+description = "Control the monomorphism restriction (default: on in Haskell 98)"
+category = "constraints"
+safe = true
+recommended = false
+
+[[extension]]
+name = "RelaxedPolyRec"
+since = "6.8.1"
+description = "Allow polymorphic recursion without explicit type signatures (default since GHC 7)"
+category = "constraints"
+safe = true
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Data Types
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "EmptyDataDecls"
+since = "6.8.1"
+description = "Allow data types with no constructors"
+category = "data"
+safe = true
+recommended = false
+
+[[extension]]
+name = "TypeData"
+since = "9.6.1"
+description = "Allow type data declarations for type-level-only data kinds"
+category = "data"
+safe = true
+recommended = false
+
+[[extension]]
+name = "NewtypeGeneralizedDeriving"
+since = "6.8.1"
+description = "Synonym for GeneralizedNewtypeDeriving"
+category = "deriving"
+safe = true
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Miscellaneous
+# ──────────────────────────────────────────────────────────────
+
+[[extension]]
+name = "NamedWildCards"
+since = "7.10.1"
+description = "Allow named wildcards (_name) in type signatures for partial type specifications"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "PartialTypeSignatures"
+since = "7.10.1"
+description = "Allow _ wildcards in type signatures to be inferred by the compiler"
+category = "types"
+safe = true
+recommended = false
+
+[[extension]]
+name = "TypeInType"
+since = "8.0.1"
+description = "Merge the type and kind language (deprecated in favor of PolyKinds + DataKinds in GHC 8.6+)"
+category = "types"
+safe = true
+recommended = false
+warn = "Deprecated since GHC 8.6; use PolyKinds and DataKinds instead"
+
+[[extension]]
+name = "UndecidableSuperClasses"
+since = "8.0.1"
+description = "Allow superclass constraints that may not terminate during resolution"
+category = "constraints"
+safe = false
+recommended = false
+warn = "Can cause the type checker to loop; use only when necessary"
+
+[[extension]]
+name = "MultilineStrings"
+since = "9.12.1"
+description = "Allow multi-line string literals with triple-quote syntax"
+category = "strings"
+safe = true
+recommended = false
+
+[[extension]]
+name = "OrPatterns"
+since = "9.12.1"
+description = "Allow combining alternative patterns with a semicolon in pattern matching"
+category = "patterns"
+safe = true
+recommended = false
+
+[[extension]]
+name = "TraditionalRecordSyntax"
+since = "7.4.1"
+description = "Control whether traditional record syntax is allowed (default: on)"
+category = "records"
+safe = true
+recommended = false
+
+[[extension]]
+name = "ExtendedDefaultRules"
+since = "6.8.1"
+description = "Extend the defaulting rules used in GHCi to compiled modules"
+category = "types"
+safe = false
+recommended = false
+warn = "Changes type defaulting behavior; primarily intended for GHCi-style use"
+
+[[extension]]
+name = "TypedTemplateHaskell"
+since = "8.0.1"
+description = "Allow typed Template Haskell splices for type-safe metaprogramming"
+category = "metaprogramming"
+safe = false
+recommended = false
+warn = "Requires TemplateHaskell; carries the same cross-compilation and compile-time costs"
+
+[[extension]]
+name = "CPP"
+since = "6.0"
+description = "Enable the C preprocessor for conditional compilation (#if, #ifdef, etc.)"
+category = "metaprogramming"
+safe = true
+recommended = false
+
+[[extension]]
+name = "UnicodeSyntax"
+since = "6.8.1"
+description = "Allow Unicode alternatives for ASCII syntax (forall -> ∀, -> -> →, etc.)"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "MonadFailDesugaring"
+since = "8.0.1"
+description = "Desugar failed pattern matches in do blocks to MonadFail.fail instead of Monad.fail"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "RebindableSyntax"
+since = "7.0.1"
+description = "Desugar do-notation, if-then-else, and literals using in-scope names instead of Prelude"
+category = "syntax"
+safe = false
+recommended = false
+warn = "Disables implicit Prelude and changes desugaring of basic syntax; very invasive"
+
+[[extension]]
+name = "IncoherentInstances"
+since = "6.8.1"
+description = "Allow GHC to pick an arbitrary instance when multiple overlap"
+category = "types"
+safe = false
+recommended = false
+warn = "Can lead to unpredictable instance selection; almost never the right choice"
+
+[[extension]]
+name = "OverlappingInstances"
+since = "6.8.1"
+description = "Allow overlapping instance declarations"
+category = "types"
+safe = false
+recommended = false
+warn = "Can lead to surprising instance selection; prefer per-instance OVERLAPPING pragmas"
+
+[[extension]]
+name = "LexicalNegation"
+since = "9.0.1"
+description = "Use whitespace to disambiguate negation from subtraction"
+category = "syntax"
+safe = true
+recommended = false
+
+[[extension]]
+name = "RecordPuns"
+since = "6.10.1"
+description = "Synonym for NamedFieldPuns"
+category = "records"
+safe = true
+recommended = false

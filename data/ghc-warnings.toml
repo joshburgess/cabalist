@@ -1,0 +1,481 @@
+# GHC Warning Flags Database
+# Each entry documents a GHC warning flag with metadata.
+#
+# Fields:
+#   flag             - The warning flag (e.g., "-Wfoo")
+#   since            - The GHC version that introduced the flag
+#   description      - A brief human-readable description
+#   group            - Which warning groups include this flag (e.g., ["-Wall"])
+#   recommended      - Whether cabalist recommends enabling this flag
+#   recommended_for  - Optional list of contexts where this is recommended (e.g., ["ci"])
+
+# ──────────────────────────────────────────────────────────────
+# Meta / Group Flags
+# ──────────────────────────────────────────────────────────────
+
+[[warning]]
+flag = "-Wall"
+since = "6.8.1"
+description = "Enable almost all warnings"
+group = []
+recommended = true
+
+[[warning]]
+flag = "-Wcompat"
+since = "8.0.1"
+description = "Enable warnings about future compatibility issues"
+group = []
+recommended = true
+
+[[warning]]
+flag = "-Weverything"
+since = "8.0.1"
+description = "Enable every single warning GHC supports (including noisy ones)"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Werror"
+since = "6.8.1"
+description = "Turn all warnings into errors"
+group = []
+recommended_for = ["ci"]
+
+[[warning]]
+flag = "-Wwarn"
+since = "6.8.1"
+description = "Make all warnings non-fatal (opposite of -Werror)"
+group = []
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Included in -Wall
+# ──────────────────────────────────────────────────────────────
+
+[[warning]]
+flag = "-Wmissing-signatures"
+since = "6.8.1"
+description = "Warn about top-level function definitions without type signatures"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wmissing-exported-signatures"
+since = "8.0.1"
+description = "Warn about exported function definitions without type signatures"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wincomplete-patterns"
+since = "6.8.1"
+description = "Warn about pattern matches that are not exhaustive"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wincomplete-uni-patterns"
+since = "7.2.1"
+description = "Warn about incomplete patterns in lambdas, let, and where bindings"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wincomplete-record-updates"
+since = "6.8.1"
+description = "Warn about record updates that don't cover all constructors"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wmissing-fields"
+since = "6.8.1"
+description = "Warn about missing fields in record construction"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wmissing-methods"
+since = "6.8.1"
+description = "Warn about missing method definitions in class instances"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Widentities"
+since = "7.4.1"
+description = "Warn about redundant conversions like fromIntegral applied to the same type"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wredundant-constraints"
+since = "8.0.1"
+description = "Warn about type class constraints that are redundant"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wunused-binds"
+since = "6.8.1"
+description = "Warn about bindings that are never used"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wunused-imports"
+since = "6.8.1"
+description = "Warn about modules imported but not used"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wunused-matches"
+since = "6.8.1"
+description = "Warn about pattern match variables that are never used"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wunused-foralls"
+since = "8.0.1"
+description = "Warn about type variables bound by forall but not used"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wunused-top-binds"
+since = "6.8.1"
+description = "Warn about top-level bindings that are never used"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wunused-local-binds"
+since = "6.8.1"
+description = "Warn about local bindings that are never used"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wunused-do-bind"
+since = "6.12.1"
+description = "Warn about do-notation bindings whose result is silently discarded"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wdeprecations"
+since = "6.8.1"
+description = "Warn about uses of functions or types marked as deprecated"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wwarnings-deprecations"
+since = "6.8.1"
+description = "Synonym for -Wdeprecations"
+group = ["-Wall"]
+recommended = false
+
+[[warning]]
+flag = "-Wdodgy-exports"
+since = "6.8.1"
+description = "Warn about suspicious export lists (e.g., exporting a type with no constructors)"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wdodgy-imports"
+since = "6.8.1"
+description = "Warn about suspicious import declarations"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Woverlapping-patterns"
+since = "6.8.1"
+description = "Warn about patterns that overlap with earlier alternatives"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Winaccessible-code"
+since = "8.6.1"
+description = "Warn about code that can never be executed"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wname-shadowing"
+since = "6.8.1"
+description = "Warn when a local binding shadows an outer binding"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Worphans"
+since = "6.8.1"
+description = "Warn about orphan instance declarations"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wmissing-home-modules"
+since = "8.2.1"
+description = "Warn about modules not listed in the cabal file"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wtype-defaults"
+since = "6.8.1"
+description = "Warn when type defaulting occurs"
+group = ["-Wall"]
+recommended = false
+
+[[warning]]
+flag = "-Wtabs"
+since = "6.8.1"
+description = "Warn about tabs in source code"
+group = ["-Wall"]
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Included in -Wcompat
+# ──────────────────────────────────────────────────────────────
+
+[[warning]]
+flag = "-Wmissing-monadfail-instances"
+since = "8.0.1"
+description = "Warn about do-notation desugaring that will require MonadFail in the future"
+group = ["-Wcompat"]
+recommended = false
+
+[[warning]]
+flag = "-Wsemigroup"
+since = "8.0.1"
+description = "Warn about missing Semigroup instances when Monoid is defined"
+group = ["-Wcompat"]
+recommended = false
+
+[[warning]]
+flag = "-Wnoncanonical-monad-instances"
+since = "8.0.1"
+description = "Warn about Monad instances with noncanonical return or (>>)"
+group = ["-Wcompat"]
+recommended = false
+
+[[warning]]
+flag = "-Wnoncanonical-monoid-instances"
+since = "8.0.1"
+description = "Warn about Monoid instances with noncanonical mappend"
+group = ["-Wcompat"]
+recommended = false
+
+[[warning]]
+flag = "-Wstar-is-type"
+since = "8.6.1"
+description = "Warn about uses of * as the kind of types (use Type from Data.Kind instead)"
+group = ["-Wcompat"]
+recommended = false
+
+[[warning]]
+flag = "-Wforall-identifier"
+since = "9.4.1"
+description = "Warn about forall used as an identifier (it will become a keyword)"
+group = ["-Wcompat"]
+recommended = false
+
+# ──────────────────────────────────────────────────────────────
+# Standalone recommended flags (not in -Wall)
+# ──────────────────────────────────────────────────────────────
+
+[[warning]]
+flag = "-Wmissing-deriving-strategies"
+since = "8.8.1"
+description = "Warn when a deriving clause doesn't specify a strategy"
+group = []
+recommended = true
+
+[[warning]]
+flag = "-Wunused-packages"
+since = "8.10.1"
+description = "Warn about packages listed in build-depends but not used"
+group = []
+recommended = true
+
+[[warning]]
+flag = "-Wmissing-export-lists"
+since = "8.4.1"
+description = "Warn about modules that don't have an explicit export list"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wpartial-fields"
+since = "8.0.1"
+description = "Warn about record fields that are only defined on some constructors"
+group = []
+recommended = true
+
+[[warning]]
+flag = "-Wredundant-bang-patterns"
+since = "9.2.1"
+description = "Warn about redundant bang patterns on strict fields"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Woperator-whitespace"
+since = "9.2.1"
+description = "Warn about suspicious uses of whitespace around operators"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wambiguous-fields"
+since = "9.2.1"
+description = "Warn about ambiguous record field selectors"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wprepositive-qualified-module"
+since = "8.10.1"
+description = "Warn about prepositive qualified syntax (suggest ImportQualifiedPost)"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wimplicit-lift"
+since = "8.0.1"
+description = "Warn about implicit uses of lift in Template Haskell splices"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wmissing-local-signatures"
+since = "8.2.1"
+description = "Warn about polymorphic local bindings without type signatures"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wmonomorphism-restriction"
+since = "6.8.1"
+description = "Warn when the monomorphism restriction is applied"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wmissing-import-lists"
+since = "7.2.1"
+description = "Warn about imports that don't specify an explicit import list"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wunrecognised-pragmas"
+since = "6.8.1"
+description = "Warn about pragmas that GHC doesn't recognize"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wderiving-defaults"
+since = "8.10.1"
+description = "Warn about deriving clauses that use the default strategy when DerivingStrategies is enabled"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wunused-record-wildcards"
+since = "8.10.1"
+description = "Warn about record wildcards where no fields are used"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wredundant-record-wildcards"
+since = "8.10.1"
+description = "Warn about record wildcards that don't bind any additional fields"
+group = ["-Wall"]
+recommended = true
+
+[[warning]]
+flag = "-Wgadt-mono-local-binds"
+since = "9.4.1"
+description = "Warn about potential issues from using GADTs without MonoLocalBinds"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wtyped-holes"
+since = "7.10.1"
+description = "Control the behavior of typed holes (enabled by default)"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wdeferred-type-errors"
+since = "7.10.1"
+description = "Warn about type errors that have been deferred to runtime"
+group = []
+recommended = true
+
+[[warning]]
+flag = "-Wpartial-type-signatures"
+since = "7.10.1"
+description = "Warn about partial type signatures (holes in type signatures)"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wimplicit-prelude"
+since = "6.8.1"
+description = "Warn about implicit imports of the Prelude"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wsafe"
+since = "7.4.1"
+description = "Warn about modules that could be marked Safe but aren't"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wunsafe"
+since = "7.4.1"
+description = "Warn about modules that are inferred to be Unsafe"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wtrustworthy-safe"
+since = "8.0.1"
+description = "Warn about Trustworthy modules that could be Safe"
+group = []
+recommended = false
+
+[[warning]]
+flag = "-Wunrecognised-warning-flags"
+since = "8.0.1"
+description = "Warn about unrecognised warning flags on the command line"
+group = []
+recommended = true
+
+[[warning]]
+flag = "-Wderiving-typeable"
+since = "7.10.1"
+description = "Warn about deriving Typeable (it is now automatic)"
+group = ["-Wall"]
+recommended = false
+
+[[warning]]
+flag = "-Wcpp-undef"
+since = "8.2.1"
+description = "Warn about undefined CPP macros in #if directives"
+group = []
+recommended = false
