@@ -7,8 +7,25 @@ use cabalist_opinions::lints::Lint;
 use cabalist_parser::ast::{self, CabalFile};
 use cabalist_parser::edit::{self, EditBatch};
 use cabalist_parser::ParseResult;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
+use tokio::sync::mpsc;
+
+/// Events sent from an async build subprocess back to the TUI event loop.
+#[derive(Debug)]
+pub enum BuildEvent {
+    /// A line of output (stdout or stderr) from the subprocess.
+    Line(String),
+    /// The subprocess completed.
+    Complete {
+        /// Whether the command succeeded (exit code 0).
+        success: bool,
+        /// Wall-clock duration of the command.
+        duration: std::time::Duration,
+    },
+    /// The subprocess failed to start or encountered an error.
+    Error(String),
+}
 
 /// Central application state.
 pub struct App {
@@ -44,6 +61,8 @@ pub struct App {
     pub build_output: Vec<String>,
     /// Whether a build subprocess is currently running.
     pub build_running: bool,
+    /// Receiver for events from an async build subprocess.
+    pub build_rx: Option<mpsc::UnboundedReceiver<BuildEvent>>,
 }
 
 impl App {
@@ -75,6 +94,7 @@ impl App {
             selected_component: 0,
             build_output: Vec::new(),
             build_running: false,
+            build_rx: None,
         };
 
         app.refresh_lints();
@@ -116,6 +136,207 @@ impl App {
     /// Set a transient status message.
     pub fn set_status(&mut self, msg: &str) {
         self.status_message = Some((msg.to_string(), Instant::now()));
+    }
+
+    /// Drain pending build events from the async subprocess channel.
+    ///
+    /// Call this on every tick of the event loop so that build output is
+    /// displayed in near-real-time.
+    pub fn drain_build_events(&mut self) {
+        // Take the receiver out so we can mutate self freely.
+        let mut rx = match self.build_rx.take() {
+            Some(rx) => rx,
+            None => return,
+        };
+
+        loop {
+            match rx.try_recv() {
+                Ok(BuildEvent::Line(line)) => {
+                    self.build_output.push(line);
+                }
+                Ok(BuildEvent::Complete { success, duration }) => {
+                    let status = if success { "succeeded" } else { "FAILED" };
+                    self.build_output.push(String::new());
+                    self.build_output
+                        .push(format!("Build {status} in {:.1}s", duration.as_secs_f64()));
+                    self.build_running = false;
+                    self.set_status(&format!("Build {status}"));
+                    // Channel is done; don't put it back.
+                    return;
+                }
+                Ok(BuildEvent::Error(e)) => {
+                    self.build_output.push(format!("Error: {e}"));
+                    self.build_running = false;
+                    self.set_status(&format!("Build error: {e}"));
+                    return;
+                }
+                Err(mpsc::error::TryRecvError::Empty) => {
+                    // No more events right now; put the receiver back.
+                    self.build_rx = Some(rx);
+                    return;
+                }
+                Err(mpsc::error::TryRecvError::Disconnected) => {
+                    // Sender was dropped without a Complete/Error — treat as error.
+                    if self.build_running {
+                        self.build_output
+                            .push("Build process terminated unexpectedly.".to_string());
+                        self.build_running = false;
+                        self.set_status("Build terminated unexpectedly");
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    /// Spawn a `cabal build` subprocess. Output streams into `build_rx`.
+    pub fn spawn_build(&mut self) {
+        if self.build_running {
+            self.set_status("A build is already running");
+            return;
+        }
+        self.build_output.clear();
+        self.build_output.push("Building...".to_string());
+        self.build_running = true;
+        self.set_status("Building...");
+
+        let working_dir = self
+            .cabal_path
+            .parent()
+            .unwrap_or(Path::new("."))
+            .to_path_buf();
+        let (tx, rx) = mpsc::unbounded_channel::<BuildEvent>();
+        self.build_rx = Some(rx);
+
+        tokio::spawn(async move {
+            // Create a line-level channel that the cabal runner streams into.
+            let (line_tx, mut line_rx) = mpsc::unbounded_channel::<cabalist_cabal::OutputLine>();
+
+            // Forward OutputLine values to our BuildEvent channel.
+            let tx_fwd = tx.clone();
+            tokio::spawn(async move {
+                while let Some(line) = line_rx.recv().await {
+                    let text = match line {
+                        cabalist_cabal::OutputLine::Stdout(s) => s,
+                        cabalist_cabal::OutputLine::Stderr(s) => s,
+                    };
+                    if tx_fwd.send(BuildEvent::Line(text)).is_err() {
+                        break;
+                    }
+                }
+            });
+
+            let result = cabalist_cabal::cabal_build(
+                &working_dir,
+                &cabalist_cabal::BuildOptions::default(),
+                Some(line_tx),
+            )
+            .await;
+
+            match result {
+                Ok(r) => {
+                    let _ = tx.send(BuildEvent::Complete {
+                        success: r.success,
+                        duration: r.output.duration,
+                    });
+                }
+                Err(e) => {
+                    let _ = tx.send(BuildEvent::Error(e.to_string()));
+                }
+            }
+        });
+    }
+
+    /// Spawn a `cabal test` subprocess. Output streams into `build_rx`.
+    pub fn spawn_test(&mut self) {
+        if self.build_running {
+            self.set_status("A build is already running");
+            return;
+        }
+        self.build_output.clear();
+        self.build_output.push("Running tests...".to_string());
+        self.build_running = true;
+        self.set_status("Running tests...");
+
+        let working_dir = self
+            .cabal_path
+            .parent()
+            .unwrap_or(Path::new("."))
+            .to_path_buf();
+        let (tx, rx) = mpsc::unbounded_channel::<BuildEvent>();
+        self.build_rx = Some(rx);
+
+        tokio::spawn(async move {
+            let (line_tx, mut line_rx) = mpsc::unbounded_channel::<cabalist_cabal::OutputLine>();
+
+            let tx_fwd = tx.clone();
+            tokio::spawn(async move {
+                while let Some(line) = line_rx.recv().await {
+                    let text = match line {
+                        cabalist_cabal::OutputLine::Stdout(s) => s,
+                        cabalist_cabal::OutputLine::Stderr(s) => s,
+                    };
+                    if tx_fwd.send(BuildEvent::Line(text)).is_err() {
+                        break;
+                    }
+                }
+            });
+
+            let result = cabalist_cabal::cabal_test(
+                &working_dir,
+                &cabalist_cabal::BuildOptions::default(),
+                Some(line_tx),
+            )
+            .await;
+
+            match result {
+                Ok(r) => {
+                    let _ = tx.send(BuildEvent::Complete {
+                        success: r.success,
+                        duration: r.output.duration,
+                    });
+                }
+                Err(e) => {
+                    let _ = tx.send(BuildEvent::Error(e.to_string()));
+                }
+            }
+        });
+    }
+
+    /// Spawn a `cabal clean` subprocess. Output streams into `build_rx`.
+    pub fn spawn_clean(&mut self) {
+        if self.build_running {
+            self.set_status("A build is already running");
+            return;
+        }
+        self.build_output.clear();
+        self.build_output.push("Cleaning...".to_string());
+        self.build_running = true;
+        self.set_status("Cleaning...");
+
+        let working_dir = self
+            .cabal_path
+            .parent()
+            .unwrap_or(Path::new("."))
+            .to_path_buf();
+        let (tx, rx) = mpsc::unbounded_channel::<BuildEvent>();
+        self.build_rx = Some(rx);
+
+        tokio::spawn(async move {
+            let result = cabalist_cabal::cabal_clean(&working_dir).await;
+
+            match result {
+                Ok(()) => {
+                    let _ = tx.send(BuildEvent::Complete {
+                        success: true,
+                        duration: std::time::Duration::ZERO,
+                    });
+                }
+                Err(e) => {
+                    let _ = tx.send(BuildEvent::Error(e.to_string()));
+                }
+            }
+        });
     }
 
     /// Total number of items in the current list (for bounds checking).

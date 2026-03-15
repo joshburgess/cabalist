@@ -110,6 +110,9 @@ async fn main() -> anyhow::Result<()> {
             _ => {}
         }
 
+        // Drain any pending build subprocess output.
+        app.drain_build_events();
+
         if app.should_quit {
             break;
         }
@@ -304,40 +307,16 @@ fn handle_action(app: &mut App, action: Action) {
             }
         }
         Action::Build => {
-            app.build_output.clear();
-            app.build_output
-                .push("Build requires `cabal` to be installed.".to_string());
-            app.build_output
-                .push("Run `cabal build` from the command line.".to_string());
-            app.build_output.push(String::new());
-            app.build_output.push(
-                "Async subprocess streaming will be available in a future release.".to_string(),
-            );
-            app.set_status("Build: use `cabal build` from the terminal");
+            app.current_view = View::Build;
+            app.spawn_build();
         }
         Action::Test => {
-            app.build_output.clear();
-            app.build_output
-                .push("Tests require `cabal` to be installed.".to_string());
-            app.build_output
-                .push("Run `cabal test` from the command line.".to_string());
-            app.build_output.push(String::new());
-            app.build_output.push(
-                "Async subprocess streaming will be available in a future release.".to_string(),
-            );
-            app.set_status("Test: use `cabal test` from the terminal");
+            app.current_view = View::Build;
+            app.spawn_test();
         }
         Action::Clean => {
-            app.build_output.clear();
-            app.build_output
-                .push("Clean requires `cabal` to be installed.".to_string());
-            app.build_output
-                .push("Run `cabal clean` from the command line.".to_string());
-            app.build_output.push(String::new());
-            app.build_output.push(
-                "Async subprocess streaming will be available in a future release.".to_string(),
-            );
-            app.set_status("Clean: use `cabal clean` from the terminal");
+            app.current_view = View::Build;
+            app.spawn_clean();
         }
         Action::ShowHelp => {
             if app.current_view == View::Help {
