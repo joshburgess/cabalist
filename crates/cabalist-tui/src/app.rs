@@ -343,11 +343,16 @@ impl App {
         Ok(())
     }
 
-    /// Re-run the opinionated lints on the current AST.
+    /// Re-run the opinionated lints on the current AST, including
+    /// filesystem-aware lints when a project root is available.
     pub fn refresh_lints(&mut self) {
         let ast = self.ast();
         let lint_config = self.config.lints.to_lint_config();
-        self.lints = cabalist_opinions::lints::run_lints(&ast, &lint_config);
+        let project_root = self
+            .cabal_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."));
+        self.lints = cabalist_opinions::lints::run_all_lints(&ast, &lint_config, project_root);
     }
 
     /// Set a transient status message.
