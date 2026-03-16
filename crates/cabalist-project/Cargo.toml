@@ -12,3 +12,7 @@ publish = false
 
 [dependencies]
 thiserror.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+pretty_assertions = "1"
