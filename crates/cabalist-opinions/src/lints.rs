@@ -76,11 +76,14 @@ pub fn run_lints(file: &CabalFile<'_>, config: &LintConfig) -> Vec<Lint> {
         lint_missing_description,
         lint_missing_source_repo,
         lint_missing_bug_reports,
+        lint_no_common_stanza,
         lint_ghc_options_werror,
         lint_missing_default_language,
+        lint_exposed_no_modules,
         lint_cabal_version_low,
         lint_duplicate_dep,
         lint_unused_flag,
+        lint_stale_tested_with,
     ];
 
     for linter in all_linters {
@@ -595,6 +598,207 @@ fn lint_unused_flag(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<L
     }
 }
 
+/// `no-common-stanza`: Multiple sections share ≥5 identical field names,
+/// suggesting the common parts should be extracted into a `common` stanza.
+fn lint_no_common_stanza(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+    const ID: &str = "no-common-stanza";
+    if !config.is_enabled(ID) {
+        return;
+    }
+    // Skip if common stanzas already exist — the user knows about them.
+    if !file.common_stanzas.is_empty() {
+        return;
+    }
+    let severity = config.effective_severity(ID, Severity::Info);
+
+    // Collect the set of field names present in each component.
+    let mut component_field_sets: Vec<(&str, std::collections::HashSet<String>)> = Vec::new();
+
+    let field_names_of = |fields: &ComponentFields<'_>| -> std::collections::HashSet<String> {
+        let mut names = std::collections::HashSet::new();
+        if fields.default_language.is_some() {
+            names.insert("default-language".to_string());
+        }
+        if !fields.ghc_options.is_empty() {
+            names.insert("ghc-options".to_string());
+        }
+        if !fields.default_extensions.is_empty() {
+            names.insert("default-extensions".to_string());
+        }
+        if !fields.build_depends.is_empty() {
+            names.insert("build-depends".to_string());
+        }
+        if !fields.hs_source_dirs.is_empty() {
+            names.insert("hs-source-dirs".to_string());
+        }
+        for f in &fields.other_fields {
+            names.insert(f.name.to_ascii_lowercase().replace('_', "-"));
+        }
+        names
+    };
+
+    if let Some(ref lib) = file.library {
+        component_field_sets.push(("library", field_names_of(&lib.fields)));
+    }
+    for exe in &file.executables {
+        let desc = exe.fields.name.unwrap_or("unnamed");
+        component_field_sets.push((desc, field_names_of(&exe.fields)));
+    }
+    for ts in &file.test_suites {
+        let desc = ts.fields.name.unwrap_or("unnamed");
+        component_field_sets.push((desc, field_names_of(&ts.fields)));
+    }
+    for bm in &file.benchmarks {
+        let desc = bm.fields.name.unwrap_or("unnamed");
+        component_field_sets.push((desc, field_names_of(&bm.fields)));
+    }
+
+    // Need at least 2 components to compare.
+    if component_field_sets.len() < 2 {
+        return;
+    }
+
+    // Find the intersection of all component field sets.
+    let mut common: std::collections::HashSet<String> = component_field_sets[0].1.clone();
+    for (_, fields) in &component_field_sets[1..] {
+        common = common.intersection(fields).cloned().collect();
+    }
+
+    if common.len() >= 5 {
+        let mut shared: Vec<&str> = common.iter().map(|s| s.as_str()).collect();
+        shared.sort();
+        lints.push(Lint {
+            id: ID,
+            severity,
+            message: format!(
+                "{} components share {} common fields ({}). \
+                 Consider extracting a 'common' stanza to reduce duplication.",
+                component_field_sets.len(),
+                common.len(),
+                shared.join(", "),
+            ),
+            span: Span::empty(0),
+            suggestion: Some(
+                "Create a 'common warnings' stanza and use 'import: warnings' in each component"
+                    .to_string(),
+            ),
+        });
+    }
+}
+
+/// `exposed-no-modules`: Library with empty or missing `exposed-modules`.
+fn lint_exposed_no_modules(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+    const ID: &str = "exposed-no-modules";
+    if !config.is_enabled(ID) {
+        return;
+    }
+    let severity = config.effective_severity(ID, Severity::Error);
+
+    if let Some(ref lib) = file.library {
+        if lib.exposed_modules.is_empty() {
+            lints.push(Lint {
+                id: ID,
+                severity,
+                message: "Library has no 'exposed-modules'. \
+                          A library must expose at least one module."
+                    .to_string(),
+                span: span_for_node(file, lib.fields.cst_node),
+                suggestion: Some(
+                    "Add 'exposed-modules: MyModule' to the library section".to_string(),
+                ),
+            });
+        }
+    }
+    for lib in &file.named_libraries {
+        if lib.exposed_modules.is_empty() {
+            let name = lib.fields.name.unwrap_or("unnamed");
+            lints.push(Lint {
+                id: ID,
+                severity,
+                message: format!(
+                    "Library '{name}' has no 'exposed-modules'. \
+                     A library must expose at least one module."
+                ),
+                span: span_for_node(file, lib.fields.cst_node),
+                suggestion: Some("Add 'exposed-modules' to this library section".to_string()),
+            });
+        }
+    }
+}
+
+/// `stale-tested-with`: `tested-with` lists a GHC version more than 2 major
+/// releases old.
+fn lint_stale_tested_with(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+    const ID: &str = "stale-tested-with";
+    if !config.is_enabled(ID) {
+        return;
+    }
+
+    // Current GHC major version baseline (9.12 as of early 2026).
+    // "More than 2 major releases old" means < 9.8.
+    const CURRENT_GHC_MAJOR: (u64, u64) = (9, 12);
+    const STALE_THRESHOLD: u64 = 2; // 2 minor releases behind the major series
+
+    let Some(ref tested_with) = file.tested_with else {
+        return;
+    };
+
+    let severity = config.effective_severity(ID, Severity::Info);
+
+    // Parse out GHC version references from the tested-with value.
+    // Format is like: "GHC ==9.8.2, GHC ==9.6.4, GHC ==8.10.7"
+    for segment in tested_with.split(',') {
+        let segment = segment.trim();
+        // Strip the "GHC" prefix and any comparison operators.
+        let version_part = segment
+            .trim_start_matches(|c: char| c.is_ascii_alphabetic())
+            .trim()
+            .trim_start_matches(|c: char| c == '=' || c == '>' || c == '<' || c == '^')
+            .trim();
+
+        if version_part.is_empty() {
+            continue;
+        }
+
+        // Parse major.minor from the version string.
+        let parts: Vec<&str> = version_part.split('.').collect();
+        let major: Option<u64> = parts.first().and_then(|s| s.parse().ok());
+        let minor: Option<u64> = parts.get(1).and_then(|s| s.parse().ok());
+
+        if let (Some(major), Some(minor)) = (major, minor) {
+            // Compute how many minor releases behind this version is.
+            // GHC versioning: 9.6, 9.8, 9.10, 9.12 — minor bumps by 2.
+            let is_stale = if major < CURRENT_GHC_MAJOR.0 {
+                true
+            } else if major == CURRENT_GHC_MAJOR.0 {
+                // Each GHC release bumps minor by 2, so "2 releases back"
+                // means minor <= current_minor - 4.
+                CURRENT_GHC_MAJOR.1.saturating_sub(minor) > STALE_THRESHOLD * 2
+            } else {
+                false
+            };
+
+            if is_stale {
+                lints.push(Lint {
+                    id: ID,
+                    severity,
+                    message: format!(
+                        "'tested-with' lists GHC {major}.{minor}, which is more than \
+                         {STALE_THRESHOLD} major releases behind the current series \
+                         ({}.{}).",
+                        CURRENT_GHC_MAJOR.0, CURRENT_GHC_MAJOR.1,
+                    ),
+                    span: Span::empty(0),
+                    suggestion: Some(
+                        "Consider updating 'tested-with' to reflect currently supported GHC versions"
+                            .to_string(),
+                    ),
+                });
+            }
+        }
+    }
+}
+
 /// List of all lint IDs recognized by this module.
 pub const ALL_LINT_IDS: &[&str] = &[
     "missing-upper-bound",
@@ -604,11 +808,14 @@ pub const ALL_LINT_IDS: &[&str] = &[
     "missing-description",
     "missing-source-repo",
     "missing-bug-reports",
+    "no-common-stanza",
     "ghc-options-werror",
     "missing-default-language",
+    "exposed-no-modules",
     "cabal-version-low",
     "duplicate-dep",
     "unused-flag",
+    "stale-tested-with",
 ];
 
 #[cfg(test)]
@@ -849,6 +1056,113 @@ library
 
     #[test]
     fn all_lint_ids_list_is_complete() {
-        assert_eq!(ALL_LINT_IDS.len(), 12);
+        assert_eq!(ALL_LINT_IDS.len(), 15);
+    }
+
+    #[test]
+    fn exposed_no_modules_fires() {
+        let source = "\
+cabal-version: 3.0
+name: foo
+version: 0.1.0.0
+
+library
+  build-depends: base ^>=4.17
+  default-language: GHC2021
+";
+        let lints = parse_and_lint(source);
+        assert!(lint_ids(&lints).contains(&"exposed-no-modules"));
+    }
+
+    #[test]
+    fn exposed_no_modules_does_not_fire_when_present() {
+        let source = "\
+cabal-version: 3.0
+name: foo
+version: 0.1.0.0
+
+library
+  build-depends: base ^>=4.17
+  exposed-modules: Foo
+  default-language: GHC2021
+";
+        let lints = parse_and_lint(source);
+        assert!(!lint_ids(&lints).contains(&"exposed-no-modules"));
+    }
+
+    #[test]
+    fn stale_tested_with_fires() {
+        let source = "\
+cabal-version: 3.0
+name: foo
+version: 0.1.0.0
+tested-with: GHC ==8.10.7
+";
+        let lints = parse_and_lint(source);
+        assert!(lint_ids(&lints).contains(&"stale-tested-with"));
+    }
+
+    #[test]
+    fn stale_tested_with_does_not_fire_for_recent() {
+        let source = "\
+cabal-version: 3.0
+name: foo
+version: 0.1.0.0
+tested-with: GHC ==9.10.1
+";
+        let lints = parse_and_lint(source);
+        assert!(!lint_ids(&lints).contains(&"stale-tested-with"));
+    }
+
+    #[test]
+    fn no_common_stanza_fires_when_sections_share_fields() {
+        let source = "\
+cabal-version: 3.0
+name: foo
+version: 0.1.0.0
+
+library
+  build-depends: base ^>=4.17
+  default-language: GHC2021
+  ghc-options: -Wall
+  default-extensions: OverloadedStrings
+  exposed-modules: Foo
+  hs-source-dirs: src
+
+executable my-exe
+  build-depends: base ^>=4.17
+  default-language: GHC2021
+  ghc-options: -Wall
+  default-extensions: OverloadedStrings
+  main-is: Main.hs
+  hs-source-dirs: app
+";
+        let lints = parse_and_lint(source);
+        assert!(lint_ids(&lints).contains(&"no-common-stanza"));
+    }
+
+    #[test]
+    fn no_common_stanza_does_not_fire_when_common_stanza_exists() {
+        let source = "\
+cabal-version: 3.0
+name: foo
+version: 0.1.0.0
+
+common warnings
+  ghc-options: -Wall
+  default-language: GHC2021
+
+library
+  import: warnings
+  build-depends: base ^>=4.17
+  exposed-modules: Foo
+
+executable my-exe
+  import: warnings
+  build-depends: base ^>=4.17
+  main-is: Main.hs
+";
+        let lints = parse_and_lint(source);
+        assert!(!lint_ids(&lints).contains(&"no-common-stanza"));
     }
 }
