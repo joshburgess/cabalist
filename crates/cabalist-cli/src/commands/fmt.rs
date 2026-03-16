@@ -8,7 +8,7 @@ use std::process::ExitCode;
 
 use anyhow::Result;
 use cabalist_opinions::config::find_and_load_config;
-use cabalist_parser::ast::derive_ast;
+use cabalist_parser::ast::{derive_ast, Component};
 use cabalist_parser::edit::{self, EditBatch};
 
 use crate::util;
@@ -59,96 +59,123 @@ pub fn run(file: &Option<PathBuf>, check: bool) -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-/// Sort items within all instances of a specific list field across all sections.
-///
-/// Strategy: for each section containing the target field, read the items,
-/// sort them, remove all, and re-add in sorted order — preserving the
-/// original list style.
-fn sort_list_field(source: &str, field_name: &str) -> String {
-    let result = cabalist_parser::parse(source);
-    let cst = &result.cst;
-    let ast = derive_ast(cst);
+/// A section identifier that survives re-parsing: keyword + optional name.
+#[derive(Debug, Clone)]
+struct SectionKey {
+    keyword: String,
+    name: Option<String>,
+}
 
-    // Collect all section node IDs that might contain the target field.
-    let mut section_ids = Vec::new();
+/// Collect stable section identifiers from the AST.
+fn collect_section_keys(source: &str) -> Vec<SectionKey> {
+    let result = cabalist_parser::parse(source);
+    let ast = derive_ast(&result.cst);
+    let mut keys = Vec::new();
+
     for comp in ast.all_components() {
-        section_ids.push(comp.cst_node());
+        let key = match comp {
+            Component::Library(lib) => SectionKey {
+                keyword: "library".to_string(),
+                name: lib.fields.name.map(|s| s.to_string()),
+            },
+            Component::Executable(exe) => SectionKey {
+                keyword: "executable".to_string(),
+                name: exe.fields.name.map(|s| s.to_string()),
+            },
+            Component::TestSuite(ts) => SectionKey {
+                keyword: "test-suite".to_string(),
+                name: ts.fields.name.map(|s| s.to_string()),
+            },
+            Component::Benchmark(bm) => SectionKey {
+                keyword: "benchmark".to_string(),
+                name: bm.fields.name.map(|s| s.to_string()),
+            },
+        };
+        keys.push(key);
     }
     for cs in &ast.common_stanzas {
-        section_ids.push(cs.fields.cst_node);
+        keys.push(SectionKey {
+            keyword: "common".to_string(),
+            name: Some(cs.name.to_string()),
+        });
     }
+    keys
+}
 
+/// Re-find a section and field in a freshly parsed source.
+fn find_section_field(
+    source: &str,
+    key: &SectionKey,
+    field_name: &str,
+) -> Option<(cabalist_parser::ParseResult, cabalist_parser::span::NodeId, cabalist_parser::span::NodeId)> {
+    let result = cabalist_parser::parse(source);
+    let section_id = edit::find_section(&result.cst, &key.keyword, key.name.as_deref())?;
+    let field_id = edit::find_field(&result.cst, section_id, field_name)?;
+    Some((result, section_id, field_id))
+}
+
+/// Sort items within all instances of a specific list field across all sections.
+///
+/// For each section containing the target field, reads items, sorts them, and
+/// rewrites by removing items one-at-a-time (re-parsing between each removal)
+/// then re-adding in sorted order (also one-at-a-time).
+fn sort_list_field(source: &str, field_name: &str) -> String {
+    let section_keys = collect_section_keys(source);
     let mut current = source.to_string();
 
-    for section_id in &section_ids {
-        // Re-parse each iteration since edits shift offsets.
-        let re_result = cabalist_parser::parse(&current);
-        let re_cst = &re_result.cst;
-
-        // We need to re-find the section after re-parsing. Use the AST to
-        // locate sections by matching keyword + name from the original AST.
-        // Simpler approach: find the field directly in this section.
-        let Some(field_id) = edit::find_field(re_cst, *section_id, field_name) else {
+    for key in &section_keys {
+        // Parse and find the field.
+        let Some((result, _section_id, field_id)) =
+            find_section_field(&current, key, field_name)
+        else {
             continue;
         };
 
-        // Detect the current list style.
-        let style = edit::detect_list_style(re_cst, field_id);
-
-        // Extract current items from the field value.
-        let items = extract_list_items(re_cst, field_id);
+        // Extract current items.
+        let items = extract_list_items(&result.cst, field_id);
         if items.len() <= 1 {
-            continue; // Nothing to sort.
+            continue;
         }
 
         // Check if already sorted.
         let mut sorted_items = items.clone();
         sorted_items.sort_by(|a, b| a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()));
         if items == sorted_items {
-            continue; // Already sorted.
+            continue;
         }
 
-        // Remove all items, then re-add in sorted order.
-        // We do this by removing each item and then adding them back sorted.
-        let mut batch = EditBatch::new();
-
-        // Remove all items.
+        // Remove items one at a time, re-parsing between each removal.
+        // Remove in reverse order so we don't need to worry about name collisions
+        // with items that share prefixes.
         for item in items.iter().rev() {
-            // Extract just the package name (before any version constraint) for matching.
+            let Some((re_result, _re_section, re_field)) =
+                find_section_field(&current, key, field_name)
+            else {
+                break;
+            };
             let item_name = item.split_whitespace().next().unwrap_or(item);
-            let edits = edit::remove_list_item(re_cst, field_id, item_name);
-            batch.add_all(edits);
+            let edits = edit::remove_list_item(&re_result.cst, re_field, item_name);
+            if !edits.is_empty() {
+                let mut batch = EditBatch::new();
+                batch.add_all(edits);
+                current = batch.apply(&re_result.cst.source);
+            }
         }
 
-        // Apply removals first.
-        if batch.is_empty() {
-            continue;
-        }
-        let after_removal = batch.apply(&re_cst.source);
-
-        // Re-parse after removal, re-find the field, and add items back sorted.
-        let re2 = cabalist_parser::parse(&after_removal);
-        let re2_cst = &re2.cst;
-        let Some(field_id2) = edit::find_field(re2_cst, *section_id, field_name) else {
-            // If we can't find the field after removal, something went wrong.
-            // Fall back to the pre-removal state.
-            continue;
-        };
-
-        let mut batch2 = EditBatch::new();
-        // Add items back in sorted order (sort=false since we pre-sorted).
+        // Re-add items in sorted order, one at a time.
         for item in &sorted_items {
-            let edits = edit::add_list_item(re2_cst, field_id2, item, false);
-            batch2.add_all(edits);
+            let Some((re_result, _re_section, re_field)) =
+                find_section_field(&current, key, field_name)
+            else {
+                break;
+            };
+            let edits = edit::add_list_item(&re_result.cst, re_field, item, false);
+            if !edits.is_empty() {
+                let mut batch = EditBatch::new();
+                batch.add_all(edits);
+                current = batch.apply(&re_result.cst.source);
+            }
         }
-
-        if !batch2.is_empty() {
-            current = batch2.apply(&re2_cst.source);
-        } else {
-            current = after_removal;
-        }
-
-        let _ = style; // We preserve the original style via the edit engine.
     }
 
     current
@@ -194,4 +221,175 @@ fn extract_list_items(
     }
 
     items
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sort_trailing_comma_deps() {
+        let source = "\
+cabal-version: 3.0
+name: test
+version: 0.1
+
+library
+  exposed-modules: Lib
+  build-depends:
+    text ^>=2.0,
+    base ^>=4.17,
+    aeson ^>=2.2,
+  default-language: GHC2021
+";
+        let sorted = sort_list_field(source, "build-depends");
+        let result = cabalist_parser::parse(&sorted);
+        let ast = derive_ast(&result.cst);
+        let lib = ast.library.as_ref().unwrap();
+        let dep_names: Vec<&str> = lib.fields.build_depends.iter().map(|d| d.package).collect();
+        assert_eq!(dep_names, vec!["aeson", "base", "text"]);
+        assert_eq!(result.cst.render(), sorted);
+    }
+
+    #[test]
+    fn sort_leading_comma_deps() {
+        let source = "\
+cabal-version: 3.0
+name: test
+version: 0.1
+
+library
+  exposed-modules: Lib
+  build-depends:
+      text ^>=2.0
+    , base ^>=4.17
+    , aeson ^>=2.2
+  default-language: GHC2021
+";
+        let sorted = sort_list_field(source, "build-depends");
+        let result = cabalist_parser::parse(&sorted);
+        let ast = derive_ast(&result.cst);
+        let lib = ast.library.as_ref().unwrap();
+        let dep_names: Vec<&str> = lib.fields.build_depends.iter().map(|d| d.package).collect();
+        assert_eq!(dep_names, vec!["aeson", "base", "text"]);
+        assert_eq!(result.cst.render(), sorted);
+    }
+
+    #[test]
+    fn sort_single_line_deps() {
+        let source = "\
+cabal-version: 3.0
+name: test
+version: 0.1
+
+library
+  exposed-modules: Lib
+  build-depends: text ^>=2.0, base ^>=4.17, aeson ^>=2.2
+  default-language: GHC2021
+";
+        let sorted = sort_list_field(source, "build-depends");
+        let result = cabalist_parser::parse(&sorted);
+        let ast = derive_ast(&result.cst);
+        let lib = ast.library.as_ref().unwrap();
+        let dep_names: Vec<&str> = lib.fields.build_depends.iter().map(|d| d.package).collect();
+        assert_eq!(dep_names, vec!["aeson", "base", "text"]);
+        assert_eq!(result.cst.render(), sorted);
+    }
+
+    #[test]
+    fn sort_modules_no_comma() {
+        let source = "\
+cabal-version: 3.0
+name: test
+version: 0.1
+
+library
+  exposed-modules:
+    Zebra
+    Alpha
+    Middle
+  default-language: GHC2021
+";
+        let sorted = sort_list_field(source, "exposed-modules");
+        let result = cabalist_parser::parse(&sorted);
+        let ast = derive_ast(&result.cst);
+        let lib = ast.library.as_ref().unwrap();
+        assert_eq!(lib.exposed_modules, vec!["Alpha", "Middle", "Zebra"]);
+        assert_eq!(result.cst.render(), sorted);
+    }
+
+    #[test]
+    fn sort_already_sorted_is_noop() {
+        let source = "\
+cabal-version: 3.0
+name: test
+version: 0.1
+
+library
+  exposed-modules: Lib
+  build-depends:
+    aeson ^>=2.2,
+    base ^>=4.17,
+    text ^>=2.0,
+  default-language: GHC2021
+";
+        let sorted = sort_list_field(source, "build-depends");
+        assert_eq!(sorted, source, "already sorted should be a no-op");
+    }
+
+    #[test]
+    fn sort_multiple_sections() {
+        let source = "\
+cabal-version: 3.0
+name: test
+version: 0.1
+
+library
+  exposed-modules: Lib
+  build-depends:
+    text ^>=2.0,
+    base ^>=4.17,
+  default-language: GHC2021
+
+executable my-exe
+  main-is: Main.hs
+  build-depends:
+    text ^>=2.0,
+    base ^>=4.17,
+  default-language: GHC2021
+";
+        let sorted = sort_list_field(source, "build-depends");
+        let result = cabalist_parser::parse(&sorted);
+        let ast = derive_ast(&result.cst);
+
+        let lib = ast.library.as_ref().unwrap();
+        let lib_deps: Vec<&str> = lib.fields.build_depends.iter().map(|d| d.package).collect();
+        assert_eq!(lib_deps, vec!["base", "text"]);
+
+        let exe = &ast.executables[0];
+        let exe_deps: Vec<&str> = exe.fields.build_depends.iter().map(|d| d.package).collect();
+        assert_eq!(exe_deps, vec!["base", "text"]);
+
+        assert_eq!(result.cst.render(), sorted);
+    }
+
+    #[test]
+    fn sort_idempotent() {
+        let source = "\
+cabal-version: 3.0
+name: test
+version: 0.1
+
+library
+  exposed-modules: Lib
+  build-depends:
+    text ^>=2.0,
+    base ^>=4.17,
+    aeson ^>=2.2,
+  default-language: GHC2021
+";
+        let first = sort_list_field(source, "build-depends");
+        let second = sort_list_field(&first, "build-depends");
+        assert_eq!(first, second, "sorting must be idempotent");
+    }
 }
