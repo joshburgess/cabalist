@@ -39,12 +39,20 @@ pub fn run(
         ProjectType::Full => TemplateKind::Full,
     };
 
+    // Detect GHC version to choose the appropriate default language.
+    let language = cabalist_ghc::versions::detect_ghc_version()
+        .as_deref()
+        .map(cabalist_opinions::defaults::language_for_ghc_version)
+        .unwrap_or(cabalist_opinions::DEFAULT_LANGUAGE)
+        .to_string();
+
     // Build template variables.
     let vars = TemplateVars {
         name: name.clone(),
         license,
         author,
         maintainer,
+        language,
         ..Default::default()
     };
 

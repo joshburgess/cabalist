@@ -228,6 +228,14 @@ pub struct App {
     pub undo_stack: Vec<String>,
     /// Scroll offset for the build output view (controlled by mouse scroll).
     pub build_scroll: usize,
+    /// Detected GHC version (e.g. "9.8.2"), if available.
+    pub ghc_version: Option<String>,
+    /// The `base` library version corresponding to the detected GHC, if known.
+    pub base_version: Option<String>,
+    /// Parsed GHC diagnostics from the last completed build.
+    pub build_diagnostics: Vec<cabalist_cabal::GhcDiagnostic>,
+    /// Index of the currently selected diagnostic for navigation.
+    pub selected_diagnostic: usize,
 }
 
 impl App {
@@ -245,6 +253,12 @@ impl App {
         let last_file_mtime = std::fs::metadata(&cabal_path)
             .and_then(|m| m.modified())
             .ok();
+
+        let ghc_version = cabalist_ghc::versions::detect_ghc_version();
+        let base_version = ghc_version
+            .as_deref()
+            .and_then(cabalist_ghc::versions::base_version_for_ghc)
+            .map(|s| s.to_string());
 
         let mut app = Self {
             cabal_path,
@@ -268,6 +282,10 @@ impl App {
             last_file_mtime,
             undo_stack: Vec::new(),
             build_scroll: 0,
+            ghc_version,
+            base_version,
+            build_diagnostics: Vec::new(),
+            selected_diagnostic: 0,
         };
 
         app.refresh_lints();
@@ -284,6 +302,12 @@ impl App {
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."));
         let config = cabalist_opinions::config::find_and_load_config(project_root);
+
+        let ghc_version = cabalist_ghc::versions::detect_ghc_version();
+        let base_version = ghc_version
+            .as_deref()
+            .and_then(cabalist_ghc::versions::base_version_for_ghc)
+            .map(|s| s.to_string());
 
         let app = Self {
             cabal_path,
@@ -307,6 +331,10 @@ impl App {
             last_file_mtime: None,
             undo_stack: Vec::new(),
             build_scroll: 0,
+            ghc_version,
+            base_version,
+            build_diagnostics: Vec::new(),
+            selected_diagnostic: 0,
         };
 
         Ok(app)
@@ -382,6 +410,13 @@ impl App {
                     self.build_output
                         .push(format!("Build {status} in {:.1}s", duration.as_secs_f64()));
                     self.build_running = false;
+
+                    // Parse diagnostics from the full build output.
+                    let full_output = self.build_output.join("\n");
+                    self.build_diagnostics =
+                        cabalist_cabal::diagnostics::parse_diagnostics(&full_output);
+                    self.selected_diagnostic = 0;
+
                     self.set_status(&format!("Build {status}"));
                     // Channel is done; don't put it back.
                     return;
@@ -420,6 +455,8 @@ impl App {
         self.build_output.clear();
         self.build_output.push("Building...".to_string());
         self.build_running = true;
+        self.build_diagnostics.clear();
+        self.selected_diagnostic = 0;
         self.set_status("Building...");
 
         let working_dir = self
@@ -478,6 +515,8 @@ impl App {
         self.build_output.clear();
         self.build_output.push("Running tests...".to_string());
         self.build_running = true;
+        self.build_diagnostics.clear();
+        self.selected_diagnostic = 0;
         self.set_status("Running tests...");
 
         let working_dir = self
@@ -534,6 +573,8 @@ impl App {
         self.build_output.clear();
         self.build_output.push("Cleaning...".to_string());
         self.build_running = true;
+        self.build_diagnostics.clear();
+        self.selected_diagnostic = 0;
         self.set_status("Cleaning...");
 
         let working_dir = self
@@ -682,7 +723,12 @@ impl App {
             maintainer: wizard.maintainer.clone(),
             category: "Development".to_string(),
             repo_url: String::new(),
-            language: "GHC2021".to_string(),
+            language: self
+                .ghc_version
+                .as_deref()
+                .map(cabalist_opinions::defaults::language_for_ghc_version)
+                .unwrap_or(cabalist_opinions::DEFAULT_LANGUAGE)
+                .to_string(),
             exposed_modules: module_name.clone(),
         };
 
