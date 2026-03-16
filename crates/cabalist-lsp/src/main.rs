@@ -3,8 +3,10 @@
 //! Provides inline diagnostics, completions, and hover information for Haskell
 //! `.cabal` files, powered by the cabalist parser and opinions engine.
 
+mod completions;
 mod convert;
 mod diagnostics;
+mod hover;
 mod server;
 mod state;
 

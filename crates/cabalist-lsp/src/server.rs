@@ -9,7 +9,9 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
 
+use crate::completions;
 use crate::diagnostics;
+use crate::hover;
 use crate::state::DocumentState;
 
 /// The LSP server backend. Holds shared state across all handler methods.
@@ -68,7 +70,16 @@ impl LanguageServer for Backend {
                         ..Default::default()
                     },
                 )),
-                // Completions and hover will be added in later phases.
+                completion_provider: Some(CompletionOptions {
+                    trigger_characters: Some(vec![
+                        ":".into(),
+                        " ".into(),
+                        "-".into(),
+                        ",".into(),
+                    ]),
+                    ..Default::default()
+                }),
+                hover_provider: Some(HoverProviderCapability::Simple(true)),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -138,5 +149,37 @@ impl LanguageServer for Backend {
         self.client
             .publish_diagnostics(uri, Vec::new(), None)
             .await;
+    }
+
+    async fn completion(
+        &self,
+        params: CompletionParams,
+    ) -> Result<Option<CompletionResponse>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+
+        let docs = self.documents.read().await;
+        let Some(doc) = docs.get(&uri) else {
+            return Ok(None);
+        };
+
+        let items = completions::completions(doc, position);
+        if items.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(CompletionResponse::Array(items)))
+        }
+    }
+
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+
+        let docs = self.documents.read().await;
+        let Some(doc) = docs.get(&uri) else {
+            return Ok(None);
+        };
+
+        Ok(hover::hover(doc, position))
     }
 }
