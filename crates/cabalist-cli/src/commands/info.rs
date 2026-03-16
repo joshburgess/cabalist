@@ -23,9 +23,9 @@ pub fn run(file: &Option<PathBuf>, format: OutputFormat) -> Result<ExitCode> {
     let config = find_and_load_config(project_root);
     let lint_config = config.lints.to_lint_config();
 
-    // Run validation + lints for health summary.
+    // Run validation + lints (including filesystem-aware lints) for health summary.
     let validation_diags = cabalist_parser::validate(&result.cst);
-    let lints = cabalist_opinions::run_lints(&ast, &lint_config);
+    let lints = cabalist_opinions::run_all_lints(&ast, &lint_config, project_root);
 
     match format {
         OutputFormat::Json => print_json_info(&ast, &validation_diags, &lints),

@@ -156,6 +156,7 @@ dependencies = [
  "cabalist-parser",
  "clap",
  "colored",
+ "directories",
  "serde",
  "serde_json",
  "tokio",

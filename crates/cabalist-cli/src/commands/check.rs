@@ -25,9 +25,9 @@ pub fn run(file: &Option<PathBuf>, strict: bool, format: OutputFormat) -> Result
     // Run spec validation.
     let validation_diags = cabalist_parser::validate(&result.cst);
 
-    // Derive AST and run opinionated lints.
+    // Derive AST and run opinionated lints (including filesystem-aware lints).
     let ast = derive_ast(&result.cst);
-    let lints = cabalist_opinions::run_lints(&ast, &lint_config);
+    let lints = cabalist_opinions::run_all_lints(&ast, &lint_config, project_root);
 
     match format {
         OutputFormat::Json => print_json_output(&cabal_path, &source, &validation_diags, &lints),
