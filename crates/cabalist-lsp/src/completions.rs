@@ -111,7 +111,11 @@ enum CompletionContext {
 }
 
 /// Compute completions for the given position in a document.
-pub fn completions(doc: &DocumentState, position: Position) -> Vec<CompletionItem> {
+pub fn completions(
+    doc: &DocumentState,
+    position: Position,
+    hackage: Option<&cabalist_hackage::HackageIndex>,
+) -> Vec<CompletionItem> {
     let offset = doc.line_index.position_to_offset(position);
     let ctx = detect_context(&doc.source, offset);
 
@@ -149,7 +153,7 @@ pub fn completions(doc: &DocumentState, position: Position) -> Vec<CompletionIte
             })
             .collect(),
         CompletionContext::FieldValue { field_name } => {
-            complete_field_value(&field_name, &doc.source, &doc.line_index)
+            complete_field_value(&field_name, &doc.source, &doc.line_index, hackage)
         }
         CompletionContext::Unknown => Vec::new(),
     }
@@ -231,9 +235,11 @@ fn find_parent_field_name(source: &str, from: usize) -> Option<String> {
 /// Generate completions for a specific field's value.
 fn complete_field_value(
     field_name: &str,
-    _source: &str,
-    _line_index: &LineIndex,
+    source: &str,
+    line_index: &LineIndex,
+    hackage: Option<&cabalist_hackage::HackageIndex>,
 ) -> Vec<CompletionItem> {
+    let _ = (source, line_index); // reserved for future use
     match field_name {
         "default-language" => static_completions(LANGUAGES, CompletionItemKind::ENUM_MEMBER),
         "build-type" => static_completions(BUILD_TYPES, CompletionItemKind::ENUM_MEMBER),
@@ -241,9 +247,43 @@ fn complete_field_value(
         "type" => static_completions(TEST_TYPES, CompletionItemKind::ENUM_MEMBER),
         "default-extensions" | "other-extensions" => extension_completions(),
         "ghc-options" | "ghc-prof-options" => warning_completions(),
-        // build-depends completions would use the hackage index — added later.
+        "build-depends" | "build-tool-depends" => package_completions(hackage),
         _ => Vec::new(),
     }
+}
+
+fn package_completions(hackage: Option<&cabalist_hackage::HackageIndex>) -> Vec<CompletionItem> {
+    let Some(index) = hackage else {
+        return Vec::new();
+    };
+
+    // Return a subset of popular packages as default completions.
+    // Full search happens as the user types (via trigger characters).
+    // We show a curated set when the field is first entered.
+    let popular = [
+        "base", "text", "bytestring", "containers", "aeson", "mtl",
+        "transformers", "vector", "unordered-containers", "hashable",
+        "filepath", "directory", "process", "time", "stm", "async",
+        "http-client", "http-types", "warp", "servant", "optparse-applicative",
+        "tasty", "hspec", "QuickCheck", "criterion",
+    ];
+
+    popular
+        .iter()
+        .filter_map(|&name| {
+            let info = index.package_info(name)?;
+            let latest = info.latest_version()?;
+            let bounds = cabalist_hackage::compute_pvp_bounds(latest);
+            Some(CompletionItem {
+                label: name.to_string(),
+                kind: Some(CompletionItemKind::MODULE),
+                detail: Some(format!("{} (latest: {})", info.synopsis, latest)),
+                insert_text: Some(format!("{name} {bounds}")),
+                sort_text: Some(format!("0_{name}")), // sort before non-popular
+                ..Default::default()
+            })
+        })
+        .collect()
 }
 
 fn static_completions(items: &[&str], kind: CompletionItemKind) -> Vec<CompletionItem> {

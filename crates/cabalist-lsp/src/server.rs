@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
+use tokio::sync::{OnceCell, RwLock};
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
@@ -20,6 +20,8 @@ pub struct Backend {
     pub client: Client,
     /// Per-document state, keyed by document URI.
     pub documents: Arc<RwLock<HashMap<Url, DocumentState>>>,
+    /// Lazily loaded Hackage package index (from cache).
+    pub hackage_index: OnceCell<Option<cabalist_hackage::HackageIndex>>,
 }
 
 impl Backend {
@@ -27,6 +29,7 @@ impl Backend {
         Self {
             client,
             documents: Arc::new(RwLock::new(HashMap::new())),
+            hackage_index: OnceCell::new(),
         }
     }
 
@@ -55,6 +58,13 @@ impl Backend {
     }
 }
 
+/// Load the Hackage index from the default cache location.
+fn load_hackage_index() -> Option<cabalist_hackage::HackageIndex> {
+    let dirs = directories::ProjectDirs::from("", "", "cabalist")?;
+    let cache_path = dirs.cache_dir().join("index.json");
+    cabalist_hackage::HackageIndex::load_from_cache(&cache_path).ok()
+}
+
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
@@ -80,6 +90,7 @@ impl LanguageServer for Backend {
                     ..Default::default()
                 }),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
+                code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -91,6 +102,11 @@ impl LanguageServer for Backend {
 
     async fn initialized(&self, _: InitializedParams) {
         tracing::info!("cabalist-lsp initialized");
+        // Eagerly load the hackage index in the background.
+        let _ = self
+            .hackage_index
+            .get_or_init(|| std::future::ready(load_hackage_index()))
+            .await;
     }
 
     async fn shutdown(&self) -> Result<()> {
@@ -108,7 +124,6 @@ impl LanguageServer for Backend {
             docs.insert(uri.clone(), DocumentState::new(source, version));
         }
 
-        // Publish diagnostics on open.
         self.publish_diagnostics(uri).await;
     }
 
@@ -116,7 +131,6 @@ impl LanguageServer for Backend {
         let uri = params.text_document.uri;
         let version = params.text_document.version;
 
-        // Full sync: the first (and only) change contains the entire document.
         if let Some(change) = params.content_changes.into_iter().next() {
             let mut docs = self.documents.write().await;
             if let Some(doc) = docs.get_mut(&uri) {
@@ -128,7 +142,6 @@ impl LanguageServer for Backend {
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
         let uri = params.text_document.uri.clone();
 
-        // If save includes text, update our copy.
         if let Some(text) = params.text {
             let mut docs = self.documents.write().await;
             if let Some(doc) = docs.get_mut(&uri) {
@@ -136,7 +149,6 @@ impl LanguageServer for Backend {
             }
         }
 
-        // Publish diagnostics on save.
         self.publish_diagnostics(uri).await;
     }
 
@@ -145,7 +157,6 @@ impl LanguageServer for Backend {
         let mut docs = self.documents.write().await;
         docs.remove(&uri);
 
-        // Clear diagnostics for closed files.
         self.client
             .publish_diagnostics(uri, Vec::new(), None)
             .await;
@@ -163,7 +174,8 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
 
-        let items = completions::completions(doc, position);
+        let hackage = self.hackage_index.get().and_then(|opt| opt.as_ref());
+        let items = completions::completions(doc, position, hackage);
         if items.is_empty() {
             Ok(None)
         } else {
@@ -180,6 +192,28 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
 
-        Ok(hover::hover(doc, position))
+        let hackage = self.hackage_index.get().and_then(|opt| opt.as_ref());
+        Ok(hover::hover(doc, position, hackage))
+    }
+
+    async fn code_action(
+        &self,
+        params: CodeActionParams,
+    ) -> Result<Option<CodeActionResponse>> {
+        let uri = params.text_document.uri;
+
+        let docs = self.documents.read().await;
+        let Some(doc) = docs.get(&uri) else {
+            return Ok(None);
+        };
+
+        let project_root = Self::project_root(&uri);
+        let actions =
+            crate::actions::code_actions(doc, &uri, &project_root, &params.range, &params.context);
+        if actions.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(actions))
+        }
     }
 }

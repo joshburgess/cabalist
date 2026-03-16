@@ -37,7 +37,11 @@ const FIELD_DOCS: &[(&str, &str)] = &[
 ];
 
 /// Compute hover information for the given position.
-pub fn hover(doc: &DocumentState, position: Position) -> Option<Hover> {
+pub fn hover(
+    doc: &DocumentState,
+    position: Position,
+    hackage: Option<&cabalist_hackage::HackageIndex>,
+) -> Option<Hover> {
     let offset = doc.line_index.position_to_offset(position);
     let source = &doc.source;
 
@@ -94,6 +98,7 @@ pub fn hover(doc: &DocumentState, position: Position) -> Option<Hover> {
     match field_name.as_str() {
         "default-extensions" | "other-extensions" => hover_extension(&word, &doc.line_index, offset, &word),
         "ghc-options" | "ghc-prof-options" => hover_warning(&word, &doc.line_index, offset, &word),
+        "build-depends" | "build-tool-depends" => hover_package(&word, &doc.line_index, offset, &word, hackage),
         _ => None,
     }
 }
@@ -160,6 +165,37 @@ fn hover_warning(
     if !w.group.is_empty() {
         doc.push_str(&format!("\n\nIncluded in: {}", w.group.join(", ")));
     }
+
+    let word_start = offset.saturating_sub(word.len());
+    Some(Hover {
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: doc,
+        }),
+        range: Some(line_index.span_to_range(cabalist_parser::span::Span::new(
+            word_start,
+            word_start + word.len(),
+        ))),
+    })
+}
+
+fn hover_package(
+    pkg_name: &str,
+    line_index: &LineIndex,
+    offset: usize,
+    word: &str,
+    hackage: Option<&cabalist_hackage::HackageIndex>,
+) -> Option<Hover> {
+    let index = hackage?;
+    let info = index.package_info(pkg_name)?;
+    let mut doc = format!("**{}**\n\n{}", info.name, info.synopsis);
+    if let Some(latest) = info.latest_version() {
+        doc.push_str(&format!("\n\nLatest version: **{}**", latest));
+        let bounds = cabalist_hackage::compute_pvp_bounds(latest);
+        doc.push_str(&format!("\nPVP bounds: `{bounds}`"));
+    }
+    let version_count = info.versions.len();
+    doc.push_str(&format!("\n\n{version_count} version(s) on Hackage"));
 
     let word_start = offset.saturating_sub(word.len());
     Some(Hover {
