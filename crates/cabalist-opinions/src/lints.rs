@@ -94,6 +94,34 @@ pub fn run_lints(file: &CabalFile<'_>, config: &LintConfig) -> Vec<Lint> {
     lints
 }
 
+/// Run filesystem-aware lints that require a project root path.
+///
+/// These lints check that paths and module names referenced in the `.cabal`
+/// file actually exist on disk. Call this in addition to [`run_lints`] when
+/// you have access to the project directory.
+pub fn run_fs_lints(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    project_root: &std::path::Path,
+) -> Vec<Lint> {
+    let mut lints = Vec::new();
+    lint_string_gaps(file, config, project_root, &mut lints);
+    lints.sort_by_key(|l| l.span.start);
+    lints
+}
+
+/// Run all lints — both pure AST lints and filesystem-aware lints.
+pub fn run_all_lints(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    project_root: &std::path::Path,
+) -> Vec<Lint> {
+    let mut lints = run_lints(file, config);
+    lints.extend(run_fs_lints(file, config, project_root));
+    lints.sort_by_key(|l| l.span.start);
+    lints
+}
+
 // ---------------------------------------------------------------------------
 // Version range helpers
 // ---------------------------------------------------------------------------
@@ -799,6 +827,107 @@ fn lint_stale_tested_with(file: &CabalFile<'_>, config: &LintConfig, lints: &mut
     }
 }
 
+/// `string-gaps`: Source directories or module names that don't match the
+/// filesystem.
+///
+/// This lint requires a project root path to check the filesystem. It verifies:
+/// - `hs-source-dirs` entries point to existing directories
+/// - Module names in `exposed-modules` and `other-modules` correspond to `.hs`
+///   or `.lhs` files under at least one of the component's source directories
+fn lint_string_gaps(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    project_root: &std::path::Path,
+    lints: &mut Vec<Lint>,
+) {
+    const ID: &str = "string-gaps";
+    if !config.is_enabled(ID) {
+        return;
+    }
+    let severity = config.effective_severity(ID, Severity::Info);
+
+    // Helper: check a component's source dirs and modules.
+    let check_component =
+        |fields: &ComponentFields<'_>,
+         exposed_modules: &[&str],
+         desc: &str,
+         lints: &mut Vec<Lint>| {
+            let source_dirs: Vec<&str> = if fields.hs_source_dirs.is_empty() {
+                vec!["."]
+            } else {
+                fields.hs_source_dirs.iter().copied().collect()
+            };
+
+            // Check that source directories exist.
+            for dir in &source_dirs {
+                let full_path = project_root.join(dir);
+                if !full_path.is_dir() {
+                    lints.push(Lint {
+                        id: ID,
+                        severity,
+                        message: format!(
+                            "{desc} lists hs-source-dirs entry '{dir}' \
+                             which does not exist on disk."
+                        ),
+                        span: span_for_node(file, fields.cst_node),
+                        suggestion: Some(format!("Create the '{dir}' directory or fix the path")),
+                    });
+                }
+            }
+
+            // Check that modules correspond to files.
+            let all_modules: Vec<&str> = exposed_modules
+                .iter()
+                .copied()
+                .chain(fields.other_modules.iter().copied())
+                .collect();
+
+            for module in &all_modules {
+                // Convert module name to relative path: Data.Map → Data/Map.hs
+                let rel_path = module.replace('.', "/");
+                let found = source_dirs.iter().any(|dir| {
+                    let base = project_root.join(dir).join(&rel_path);
+                    base.with_extension("hs").is_file() || base.with_extension("lhs").is_file()
+                });
+                if !found {
+                    lints.push(Lint {
+                        id: ID,
+                        severity,
+                        message: format!(
+                            "{desc} lists module '{module}' but no corresponding \
+                             .hs or .lhs file was found in any source directory."
+                        ),
+                        span: span_for_node(file, fields.cst_node),
+                        suggestion: Some(format!(
+                            "Create '{}.hs' or remove '{module}' from the module list",
+                            rel_path.replace('/', "/")
+                        )),
+                    });
+                }
+            }
+        };
+
+    if let Some(ref lib) = file.library {
+        check_component(&lib.fields, &lib.exposed_modules, "Library", lints);
+    }
+    for lib in &file.named_libraries {
+        let desc = format!("Library '{}'", lib.fields.name.unwrap_or("unnamed"));
+        check_component(&lib.fields, &lib.exposed_modules, &desc, lints);
+    }
+    for exe in &file.executables {
+        let desc = format!("Executable '{}'", exe.fields.name.unwrap_or("unnamed"));
+        check_component(&exe.fields, &[], &desc, lints);
+    }
+    for ts in &file.test_suites {
+        let desc = format!("Test-suite '{}'", ts.fields.name.unwrap_or("unnamed"));
+        check_component(&ts.fields, &[], &desc, lints);
+    }
+    for bm in &file.benchmarks {
+        let desc = format!("Benchmark '{}'", bm.fields.name.unwrap_or("unnamed"));
+        check_component(&bm.fields, &[], &desc, lints);
+    }
+}
+
 /// List of all lint IDs recognized by this module.
 pub const ALL_LINT_IDS: &[&str] = &[
     "missing-upper-bound",
@@ -812,6 +941,7 @@ pub const ALL_LINT_IDS: &[&str] = &[
     "ghc-options-werror",
     "missing-default-language",
     "exposed-no-modules",
+    "string-gaps",
     "cabal-version-low",
     "duplicate-dep",
     "unused-flag",
@@ -1056,7 +1186,7 @@ library
 
     #[test]
     fn all_lint_ids_list_is_complete() {
-        assert_eq!(ALL_LINT_IDS.len(), 15);
+        assert_eq!(ALL_LINT_IDS.len(), 16);
     }
 
     #[test]
@@ -1164,5 +1294,80 @@ executable my-exe
 ";
         let lints = parse_and_lint(source);
         assert!(!lint_ids(&lints).contains(&"no-common-stanza"));
+    }
+
+    #[test]
+    fn string_gaps_missing_source_dir() {
+        let tmp = std::env::temp_dir().join("cabalist-test-string-gaps-dir");
+        let _ = std::fs::create_dir_all(&tmp);
+
+        let source = "\
+cabal-version: 3.0
+name: foo
+version: 0.1.0.0
+
+library
+  hs-source-dirs: nonexistent-dir
+  exposed-modules: Foo
+  default-language: GHC2021
+";
+        let result = parse(source);
+        let ast = derive_ast(&result.cst);
+        let lints = run_fs_lints(&ast, &LintConfig::default(), &tmp);
+        assert!(lint_ids(&lints).contains(&"string-gaps"));
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn string_gaps_missing_module_file() {
+        let tmp = std::env::temp_dir().join("cabalist-test-string-gaps-mod");
+        let _ = std::fs::remove_dir_all(&tmp);
+        let src_dir = tmp.join("src");
+        std::fs::create_dir_all(&src_dir).unwrap();
+
+        let source = "\
+cabal-version: 3.0
+name: foo
+version: 0.1.0.0
+
+library
+  hs-source-dirs: src
+  exposed-modules: Foo.Bar
+  default-language: GHC2021
+";
+        let result = parse(source);
+        let ast = derive_ast(&result.cst);
+        let lints = run_fs_lints(&ast, &LintConfig::default(), &tmp);
+        // Should fire: src/Foo/Bar.hs does not exist.
+        assert!(lint_ids(&lints).contains(&"string-gaps"));
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn string_gaps_no_fire_when_files_exist() {
+        let tmp = std::env::temp_dir().join("cabalist-test-string-gaps-ok");
+        let _ = std::fs::remove_dir_all(&tmp);
+        let src_dir = tmp.join("src").join("Foo");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        std::fs::write(src_dir.join("Bar.hs"), "module Foo.Bar where\n").unwrap();
+
+        let source = "\
+cabal-version: 3.0
+name: foo
+version: 0.1.0.0
+
+library
+  hs-source-dirs: src
+  exposed-modules: Foo.Bar
+  default-language: GHC2021
+";
+        let result = parse(source);
+        let ast = derive_ast(&result.cst);
+        let lints = run_fs_lints(&ast, &LintConfig::default(), &tmp);
+        assert!(!lint_ids(&lints).contains(&"string-gaps"));
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }

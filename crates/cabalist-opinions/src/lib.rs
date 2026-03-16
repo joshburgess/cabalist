@@ -27,5 +27,5 @@ pub use defaults::{
     DEFAULT_CABAL_VERSION, DEFAULT_EXTENSIONS, DEFAULT_GHC_OPTIONS, DEFAULT_LANGUAGE,
     DEFAULT_LAYOUT, DEFAULT_LICENSE,
 };
-pub use lints::{run_lints, Lint, LintConfig, ALL_LINT_IDS};
+pub use lints::{run_all_lints, run_fs_lints, run_lints, Lint, LintConfig, ALL_LINT_IDS};
 pub use templates::{render_template, TemplateKind, TemplateVars};
