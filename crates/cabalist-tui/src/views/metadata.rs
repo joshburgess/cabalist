@@ -1,13 +1,13 @@
 //! Metadata editor view — top-level package metadata fields.
 
 use crate::app::App;
-use ratatui::layout::Rect;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::Frame;
 
 /// Metadata fields displayed in this view (label, extractor).
-static METADATA_FIELDS: &[&str] = &[
+pub static METADATA_FIELDS: &[&str] = &[
     "name",
     "version",
     "cabal-version",
@@ -36,6 +36,15 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
+    // Split inner area into the field list and a hint bar at the bottom.
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(1)])
+        .split(inner);
+
+    let list_area = chunks[0];
+    let hint_area = chunks[1];
+
     let mut lines: Vec<Line<'_>> = Vec::new();
 
     for (i, &field_name) in METADATA_FIELDS.iter().enumerate() {
@@ -61,13 +70,22 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         let display_value = value.unwrap_or_else(|| "(not set)".to_string());
         let has_value = display_value != "(not set)";
 
+        // When editing the selected field, show the edit buffer instead.
+        let is_editing = app.editing_metadata && is_selected;
+
         let base_style = if is_selected {
             theme.selected()
         } else {
             theme.normal()
         };
 
-        let indicator = if has_value { " + " } else { " - " };
+        let indicator = if is_editing {
+            " > "
+        } else if has_value {
+            " + "
+        } else {
+            " - "
+        };
         let ind_style = if is_selected {
             theme.selected()
         } else if has_value {
@@ -76,20 +94,34 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
             theme.muted_style()
         };
 
-        // Truncate long values.
-        let truncated: String = if display_value.len() > 50 {
-            format!("{}...", &display_value[..47])
+        let value_text: String = if is_editing {
+            // Show the edit buffer with a block cursor.
+            format!("{}_", app.metadata_edit_buffer)
         } else {
-            display_value
+            // Truncate long values.
+            if display_value.len() > 50 {
+                format!("{}...", &display_value[..47])
+            } else {
+                display_value
+            }
         };
 
         lines.push(Line::from(vec![
             Span::styled(indicator, ind_style),
             Span::styled(format!("{field_name:<16}"), base_style),
-            Span::styled(truncated, base_style),
+            Span::styled(value_text, base_style),
         ]));
     }
 
     let paragraph = Paragraph::new(lines);
-    frame.render_widget(paragraph, inner);
+    frame.render_widget(paragraph, list_area);
+
+    // Render hint bar.
+    let hint_text = if app.editing_metadata {
+        "[Enter] save  [Esc] cancel"
+    } else {
+        "[Enter] edit  [Esc] back  [j/k] navigate"
+    };
+    let hint = Paragraph::new(Line::from(Span::styled(hint_text, theme.muted_style())));
+    frame.render_widget(hint, hint_area);
 }

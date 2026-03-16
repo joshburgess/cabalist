@@ -952,6 +952,43 @@ pub fn set_field_value(cst: &CabalCst, field_node: NodeId, value: &str) -> TextE
 }
 
 // ---------------------------------------------------------------------------
+// Root-level (top-level metadata) editing
+// ---------------------------------------------------------------------------
+
+/// Add a new top-level metadata field to the root of the file.
+///
+/// The field is inserted after the last existing top-level field and before
+/// any section (library, executable, etc.). Formatted as
+/// `{field_name}: {field_value}\n` with no indentation (top-level).
+pub fn add_field_to_root(cst: &CabalCst, field_name: &str, field_value: &str) -> TextEdit {
+    let root = cst.node(cst.root);
+
+    // Find the insertion point: after the last top-level Field node and before
+    // the first Section node.
+    let mut insert_at = 0usize;
+    for &child_id in &root.children {
+        let child = cst.node(child_id);
+        match child.kind {
+            CstNodeKind::Field | CstNodeKind::Comment | CstNodeKind::BlankLine => {
+                insert_at = child.span.end;
+            }
+            CstNodeKind::Section => {
+                // Insert before the first section.
+                break;
+            }
+            _ => {
+                insert_at = child.span.end;
+            }
+        }
+    }
+
+    TextEdit {
+        range: Span::new(insert_at, insert_at),
+        replacement: format!("{field_name}: {field_value}\n"),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Section-level editing
 // ---------------------------------------------------------------------------
 
