@@ -14,3 +14,4 @@ publish = false
 thiserror.workspace = true
 
 [dev-dependencies]
+proptest = "1"
