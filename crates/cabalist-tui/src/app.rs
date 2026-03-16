@@ -236,6 +236,16 @@ pub struct App {
     pub build_diagnostics: Vec<cabalist_cabal::GhcDiagnostic>,
     /// Index of the currently selected diagnostic for navigation.
     pub selected_diagnostic: usize,
+    /// Current Hackage search results (populated as the user types).
+    pub search_results: Vec<cabalist_hackage::SearchResult>,
+    /// Index of the highlighted result in the search popup.
+    pub search_selected: usize,
+    /// Hackage package index, loaded once at startup from cache.
+    pub hackage_index: Option<cabalist_hackage::HackageIndex>,
+    /// Whether we are in inline-edit mode for a metadata field.
+    pub editing_metadata: bool,
+    /// The text being edited for the current metadata field.
+    pub metadata_edit_buffer: String,
 }
 
 impl App {
@@ -259,6 +269,8 @@ impl App {
             .as_deref()
             .and_then(cabalist_ghc::versions::base_version_for_ghc)
             .map(|s| s.to_string());
+
+        let hackage_index = load_hackage_index_from_cache();
 
         let mut app = Self {
             cabal_path,
@@ -286,6 +298,11 @@ impl App {
             base_version,
             build_diagnostics: Vec::new(),
             selected_diagnostic: 0,
+            search_results: Vec::new(),
+            search_selected: 0,
+            hackage_index,
+            editing_metadata: false,
+            metadata_edit_buffer: String::new(),
         };
 
         app.refresh_lints();
@@ -308,6 +325,8 @@ impl App {
             .as_deref()
             .and_then(cabalist_ghc::versions::base_version_for_ghc)
             .map(|s| s.to_string());
+
+        let hackage_index = load_hackage_index_from_cache();
 
         let app = Self {
             cabal_path,
@@ -335,6 +354,11 @@ impl App {
             base_version,
             build_diagnostics: Vec::new(),
             selected_diagnostic: 0,
+            search_results: Vec::new(),
+            search_selected: 0,
+            hackage_index,
+            editing_metadata: false,
+            metadata_edit_buffer: String::new(),
         };
 
         Ok(app)
@@ -677,6 +701,24 @@ impl App {
         Ok(())
     }
 
+    /// Set a top-level metadata field to a new value.
+    ///
+    /// If the field already exists in the CST, its value is replaced. If it
+    /// does not exist, a new field is inserted at the root level.
+    pub fn set_metadata_field(&mut self, field_name: &str, value: &str) -> Result<(), String> {
+        let cst = &self.parse_result.cst;
+        let root = cst.root;
+
+        let edits = if let Some(field_id) = edit::find_field(cst, root, field_name) {
+            vec![edit::set_field_value(cst, field_id, value)]
+        } else {
+            vec![edit::add_field_to_root(cst, field_name, value)]
+        };
+
+        self.apply_edits(edits);
+        Ok(())
+    }
+
     /// Check if the .cabal file has been modified externally, and reload if so.
     ///
     /// Does nothing if there are unsaved changes (dirty flag is set).
@@ -887,6 +929,21 @@ impl App {
         Ok(())
     }
 
+    /// Update search results from the Hackage index based on the current query.
+    pub fn update_search_results(&mut self) {
+        if let Some(ref index) = self.hackage_index {
+            if self.search_query.len() >= 2 {
+                let results = index.search(&self.search_query);
+                self.search_results = results.into_iter().take(10).collect();
+            } else {
+                self.search_results.clear();
+            }
+        } else {
+            self.search_results.clear();
+        }
+        self.search_selected = 0;
+    }
+
     /// Get the name of the dependency at the given index in the current component.
     pub fn dep_name_at_index(&self, idx: usize) -> Option<String> {
         let ast = self.ast();
@@ -1065,6 +1122,15 @@ fn create_project_dirs(
     }
 
     Ok(())
+}
+
+/// Try to load the Hackage index from the platform cache directory.
+///
+/// Returns `None` if the cache file does not exist or cannot be read.
+fn load_hackage_index_from_cache() -> Option<cabalist_hackage::HackageIndex> {
+    let dirs = directories::ProjectDirs::from("", "", "cabalist")?;
+    let cache_path = dirs.cache_dir().join("index.json");
+    cabalist_hackage::HackageIndex::load_from_cache(&cache_path).ok()
 }
 
 /// Count dependencies in a component by index.

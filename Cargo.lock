@@ -230,6 +230,7 @@ dependencies = [
  "cabalist-parser",
  "clap",
  "crossterm",
+ "directories",
  "ratatui",
  "tokio",
  "tracing",

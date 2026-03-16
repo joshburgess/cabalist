@@ -72,6 +72,16 @@ pub enum Action {
     NextDiagnostic,
     /// Navigate to the previous build diagnostic.
     PrevDiagnostic,
+    /// Start editing the currently selected metadata field.
+    MetadataStartEdit,
+    /// Type a character into the metadata edit buffer.
+    MetadataInput(char),
+    /// Delete a character from the metadata edit buffer.
+    MetadataBackspace,
+    /// Confirm the metadata edit (write the new value).
+    MetadataConfirm,
+    /// Cancel the metadata edit.
+    MetadataCancel,
 }
 
 /// Map a key event to an action based on current app state.
@@ -79,6 +89,11 @@ pub fn handle_key(app: &App, key: KeyEvent) -> Action {
     // If the init wizard is active, route to init key handler.
     if app.current_view == View::Init && app.init_wizard.is_some() {
         return handle_init_key(app, key);
+    }
+
+    // If metadata inline edit is active, route to metadata edit handler.
+    if app.editing_metadata {
+        return handle_metadata_edit_key(key);
     }
 
     // If search is active, route most keys to search input.
@@ -120,7 +135,7 @@ fn handle_view_key(app: &App, key: KeyEvent) -> Action {
         View::Dependencies => handle_deps_key(key),
         View::Extensions => handle_extensions_key(key),
         View::Build => handle_build_key(key),
-        View::Metadata => Action::None,
+        View::Metadata => handle_metadata_key(key),
         View::Help => {
             // Any key closes the help overlay.
             Action::Back
@@ -167,11 +182,37 @@ fn handle_build_key(key: KeyEvent) -> Action {
     }
 }
 
+/// Handle keys in the metadata view when NOT in inline-edit mode.
+fn handle_metadata_key(key: KeyEvent) -> Action {
+    match key.code {
+        KeyCode::Enter => Action::MetadataStartEdit,
+        _ => Action::None,
+    }
+}
+
+/// Handle keys when inline-editing a metadata field value.
+fn handle_metadata_edit_key(key: KeyEvent) -> Action {
+    // Ctrl+C still quits.
+    if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('c') {
+        return Action::Quit;
+    }
+
+    match key.code {
+        KeyCode::Esc => Action::MetadataCancel,
+        KeyCode::Enter => Action::MetadataConfirm,
+        KeyCode::Backspace => Action::MetadataBackspace,
+        KeyCode::Char(c) => Action::MetadataInput(c),
+        _ => Action::None,
+    }
+}
+
 fn handle_search_key(key: KeyEvent) -> Action {
     match key.code {
         KeyCode::Esc => Action::Back,
         KeyCode::Enter => Action::Select,
         KeyCode::Backspace => Action::SearchBackspace,
+        KeyCode::Up => Action::MoveUp,
+        KeyCode::Down => Action::MoveDown,
         KeyCode::Char(c) => Action::SearchInput(c),
         _ => Action::None,
     }

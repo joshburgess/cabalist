@@ -200,6 +200,8 @@ fn handle_action(app: &mut App, action: Action) {
             app.selected_index = 0;
             app.search_query.clear();
             app.search_active = false;
+            app.search_results.clear();
+            app.search_selected = 0;
         }
         Action::Save => {
             if let Err(e) = app.save() {
@@ -217,14 +219,26 @@ fn handle_action(app: &mut App, action: Action) {
             }
         }
         Action::MoveUp => {
-            if app.selected_index > 0 {
+            if app.search_active {
+                if app.search_selected > 0 {
+                    app.search_selected -= 1;
+                } else if !app.search_results.is_empty() {
+                    app.search_selected = app.search_results.len() - 1;
+                }
+            } else if app.selected_index > 0 {
                 app.selected_index -= 1;
             }
         }
         Action::MoveDown => {
-            let max = app.current_list_len().saturating_sub(1);
-            if app.selected_index < max {
-                app.selected_index += 1;
+            if app.search_active {
+                if !app.search_results.is_empty() {
+                    app.search_selected = (app.search_selected + 1) % app.search_results.len();
+                }
+            } else {
+                let max = app.current_list_len().saturating_sub(1);
+                if app.selected_index < max {
+                    app.selected_index += 1;
+                }
             }
         }
         Action::MoveToTop => {
@@ -236,9 +250,25 @@ fn handle_action(app: &mut App, action: Action) {
         Action::Select => {
             if app.search_active && app.current_view == View::Dependencies {
                 // User submitted search in deps view — add as dependency.
-                let dep_str = app.search_query.trim().to_string();
+                let dep_str = if !app.search_results.is_empty() {
+                    let selected = &app.search_results[app.search_selected];
+                    if let Some(ref idx) = app.hackage_index {
+                        if let Some(latest) = idx.latest_version(&selected.package.name) {
+                            let bounds = cabalist_hackage::compute_pvp_bounds(latest);
+                            format!("{} {bounds}", selected.package.name)
+                        } else {
+                            selected.package.name.clone()
+                        }
+                    } else {
+                        selected.package.name.clone()
+                    }
+                } else {
+                    app.search_query.trim().to_string()
+                };
                 app.search_active = false;
                 app.search_query.clear();
+                app.search_results.clear();
+                app.search_selected = 0;
                 if dep_str.is_empty() {
                     app.set_status("No package name entered");
                 } else {
@@ -255,6 +285,8 @@ fn handle_action(app: &mut App, action: Action) {
             if app.search_active {
                 app.search_active = false;
                 app.search_query.clear();
+                app.search_results.clear();
+                app.search_selected = 0;
             } else if app.current_view == View::Help {
                 app.current_view = View::Dashboard;
             } else if app.current_view != View::Dashboard {
@@ -274,18 +306,24 @@ fn handle_action(app: &mut App, action: Action) {
             app.search_active = !app.search_active;
             if !app.search_active {
                 app.search_query.clear();
+                app.search_results.clear();
+                app.search_selected = 0;
             }
         }
         Action::SearchInput(c) => {
             app.search_query.push(c);
+            app.update_search_results();
         }
         Action::SearchBackspace => {
             app.search_query.pop();
+            app.update_search_results();
         }
         Action::AddItem => {
             // Open search for adding a dependency.
             app.search_active = true;
             app.search_query.clear();
+            app.search_results.clear();
+            app.search_selected = 0;
             app.set_status("Type to search...");
         }
         Action::RemoveItem => {
@@ -442,6 +480,55 @@ fn handle_action(app: &mut App, action: Action) {
             } else {
                 app.set_status("No diagnostics to navigate");
             }
+        }
+        Action::MetadataStartEdit => {
+            if let Some(&field_name) = views::metadata::METADATA_FIELDS.get(app.selected_index) {
+                // Load the current value into the edit buffer.
+                let ast = app.ast();
+                let current_value = match field_name {
+                    "name" => ast.name.map(|s| s.to_string()),
+                    "version" => ast.version.as_ref().map(|v| v.to_string()),
+                    "cabal-version" => ast.cabal_version.as_ref().map(|cv| cv.raw.to_string()),
+                    "license" => ast.license.map(|s| s.to_string()),
+                    "author" => ast.author.map(|s| s.to_string()),
+                    "maintainer" => ast.maintainer.map(|s| s.to_string()),
+                    "homepage" => ast.homepage.map(|s| s.to_string()),
+                    "bug-reports" => ast.bug_reports.map(|s| s.to_string()),
+                    "synopsis" => ast.synopsis.map(|s| s.to_string()),
+                    "description" => ast.description.map(|s| s.to_string()),
+                    "category" => ast.category.map(|s| s.to_string()),
+                    "build-type" => ast.build_type.map(|s| s.to_string()),
+                    "tested-with" => ast.tested_with.map(|s| s.to_string()),
+                    _ => None,
+                };
+                app.metadata_edit_buffer = current_value.unwrap_or_default();
+                app.editing_metadata = true;
+            }
+        }
+        Action::MetadataInput(c) => {
+            app.metadata_edit_buffer.push(c);
+        }
+        Action::MetadataBackspace => {
+            app.metadata_edit_buffer.pop();
+        }
+        Action::MetadataConfirm => {
+            let field_name = views::metadata::METADATA_FIELDS
+                .get(app.selected_index)
+                .copied()
+                .unwrap_or("");
+            let value = app.metadata_edit_buffer.clone();
+            app.editing_metadata = false;
+            if !field_name.is_empty() {
+                match app.set_metadata_field(field_name, &value) {
+                    Ok(()) => app.set_status(&format!("Updated {field_name}")),
+                    Err(e) => app.set_status(&format!("Failed: {e}")),
+                }
+            }
+        }
+        Action::MetadataCancel => {
+            app.editing_metadata = false;
+            app.metadata_edit_buffer.clear();
+            app.set_status("Edit cancelled");
         }
     }
 }
