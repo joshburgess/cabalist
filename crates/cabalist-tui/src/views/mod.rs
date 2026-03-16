@@ -5,6 +5,7 @@ pub mod dashboard;
 pub mod deps;
 pub mod extensions;
 pub mod help;
+pub mod init;
 pub mod metadata;
 
 /// The active view in the TUI.
@@ -22,4 +23,6 @@ pub enum View {
     Metadata,
     /// Help overlay (renders on top of the current view).
     Help,
+    /// Init wizard for creating a new project.
+    Init,
 }

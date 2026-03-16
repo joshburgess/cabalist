@@ -4,6 +4,7 @@ use crate::theme::Theme;
 use crate::views::View;
 use cabalist_opinions::config::CabalistConfig;
 use cabalist_opinions::lints::Lint;
+use cabalist_opinions::templates::TemplateKind;
 use cabalist_parser::ast::{self, CabalFile};
 use cabalist_parser::edit::{self, EditBatch};
 use cabalist_parser::ParseResult;
@@ -26,6 +27,162 @@ pub enum BuildEvent {
     /// The subprocess failed to start or encountered an error.
     Error(String),
 }
+
+/// Steps in the init wizard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InitStep {
+    /// Step 1: project name.
+    Name,
+    /// Step 2: project type / template.
+    Template,
+    /// Step 3: license.
+    License,
+    /// Step 4: author / maintainer.
+    Author,
+    /// Step 5: synopsis.
+    Synopsis,
+    /// Step 6: review and confirm.
+    Confirm,
+}
+
+impl InitStep {
+    /// The 1-based step number.
+    pub fn number(&self) -> usize {
+        match self {
+            InitStep::Name => 1,
+            InitStep::Template => 2,
+            InitStep::License => 3,
+            InitStep::Author => 4,
+            InitStep::Synopsis => 5,
+            InitStep::Confirm => 6,
+        }
+    }
+
+    /// Advance to the next step, if any.
+    pub fn next(&self) -> Option<InitStep> {
+        match self {
+            InitStep::Name => Some(InitStep::Template),
+            InitStep::Template => Some(InitStep::License),
+            InitStep::License => Some(InitStep::Author),
+            InitStep::Author => Some(InitStep::Synopsis),
+            InitStep::Synopsis => Some(InitStep::Confirm),
+            InitStep::Confirm => None,
+        }
+    }
+
+    /// Go back to the previous step, if any.
+    pub fn prev(&self) -> Option<InitStep> {
+        match self {
+            InitStep::Name => None,
+            InitStep::Template => Some(InitStep::Name),
+            InitStep::License => Some(InitStep::Template),
+            InitStep::Author => Some(InitStep::License),
+            InitStep::Synopsis => Some(InitStep::Author),
+            InitStep::Confirm => Some(InitStep::Synopsis),
+        }
+    }
+}
+
+/// State for the init wizard.
+pub struct InitWizard {
+    /// Current wizard step.
+    pub step: InitStep,
+    /// Project name.
+    pub name: String,
+    /// Selected template kind.
+    pub template: TemplateKind,
+    /// License identifier.
+    pub license: String,
+    /// Author name.
+    pub author: String,
+    /// Maintainer (email).
+    pub maintainer: String,
+    /// One-line synopsis.
+    pub synopsis: String,
+    /// Whether the current text field is being edited.
+    pub editing: bool,
+    /// Text input buffer for the current field.
+    pub input_buffer: String,
+}
+
+impl InitWizard {
+    /// Create a new init wizard with auto-detected defaults.
+    pub fn new() -> Self {
+        let dir_name = std::env::current_dir()
+            .ok()
+            .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+            .unwrap_or_else(|| "my-project".to_string());
+
+        let git_name = std::process::Command::new("git")
+            .args(["config", "user.name"])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+
+        let git_email = std::process::Command::new("git")
+            .args(["config", "user.email"])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+
+        Self {
+            step: InitStep::Name,
+            name: dir_name.clone(),
+            template: TemplateKind::LibAndExe,
+            license: "MIT".to_string(),
+            author: git_name,
+            maintainer: git_email,
+            synopsis: String::new(),
+            editing: true,
+            input_buffer: dir_name,
+        }
+    }
+
+    /// Get the current field value based on the step.
+    fn current_value(&self) -> &str {
+        match self.step {
+            InitStep::Name => &self.name,
+            InitStep::License => &self.license,
+            InitStep::Author => &self.author,
+            InitStep::Synopsis => &self.synopsis,
+            InitStep::Template | InitStep::Confirm => "",
+        }
+    }
+
+    /// Commit the input buffer to the current field.
+    pub fn commit_input(&mut self) {
+        match self.step {
+            InitStep::Name => self.name = self.input_buffer.clone(),
+            InitStep::License => self.license = self.input_buffer.clone(),
+            InitStep::Author => self.author = self.input_buffer.clone(),
+            InitStep::Synopsis => self.synopsis = self.input_buffer.clone(),
+            InitStep::Template | InitStep::Confirm => {}
+        }
+    }
+
+    /// Load the current field's value into the input buffer.
+    pub fn load_input(&mut self) {
+        self.input_buffer = self.current_value().to_string();
+        self.editing = matches!(
+            self.step,
+            InitStep::Name | InitStep::License | InitStep::Author | InitStep::Synopsis
+        );
+    }
+
+    /// Cycle the template selection (for the Template step).
+    pub fn cycle_template(&mut self) {
+        let all = TemplateKind::all();
+        let idx = all.iter().position(|k| *k == self.template).unwrap_or(0);
+        self.template = all[(idx + 1) % all.len()];
+    }
+}
+
+/// Maximum number of undo states to keep.
+const MAX_UNDO_ENTRIES: usize = 50;
 
 /// Central application state.
 pub struct App {
@@ -63,6 +220,14 @@ pub struct App {
     pub build_running: bool,
     /// Receiver for events from an async build subprocess.
     pub build_rx: Option<mpsc::UnboundedReceiver<BuildEvent>>,
+    /// Init wizard state (Some when the wizard is active).
+    pub init_wizard: Option<InitWizard>,
+    /// Last known modification time of the .cabal file on disk.
+    pub last_file_mtime: Option<std::time::SystemTime>,
+    /// Undo stack — previous source strings for Ctrl+Z.
+    pub undo_stack: Vec<String>,
+    /// Scroll offset for the build output view (controlled by mouse scroll).
+    pub build_scroll: usize,
 }
 
 impl App {
@@ -76,6 +241,10 @@ impl App {
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."));
         let config = cabalist_opinions::config::find_and_load_config(project_root);
+
+        let last_file_mtime = std::fs::metadata(&cabal_path)
+            .and_then(|m| m.modified())
+            .ok();
 
         let mut app = Self {
             cabal_path,
@@ -95,9 +264,51 @@ impl App {
             build_output: Vec::new(),
             build_running: false,
             build_rx: None,
+            init_wizard: None,
+            last_file_mtime,
+            undo_stack: Vec::new(),
+            build_scroll: 0,
         };
 
         app.refresh_lints();
+        Ok(app)
+    }
+
+    /// Create a new `App` in init wizard mode (no .cabal file exists yet).
+    pub fn new_for_init(cabal_path: PathBuf, theme: Theme) -> anyhow::Result<Self> {
+        // Parse an empty source so the app has a valid parse result.
+        let source = String::new();
+        let parse_result = cabalist_parser::parse(&source);
+
+        let project_root = cabal_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."));
+        let config = cabalist_opinions::config::find_and_load_config(project_root);
+
+        let app = Self {
+            cabal_path,
+            source,
+            parse_result,
+            lints: Vec::new(),
+            config,
+            theme,
+            current_view: View::Init,
+            dirty: false,
+            should_quit: false,
+            status_message: None,
+            search_query: String::new(),
+            search_active: false,
+            selected_index: 0,
+            selected_component: 0,
+            build_output: Vec::new(),
+            build_running: false,
+            build_rx: None,
+            init_wizard: Some(InitWizard::new()),
+            last_file_mtime: None,
+            undo_stack: Vec::new(),
+            build_scroll: 0,
+        };
+
         Ok(app)
     }
 
@@ -113,6 +324,9 @@ impl App {
         self.parse_result = cabalist_parser::parse(&self.source);
         self.refresh_lints();
         self.dirty = false;
+        self.last_file_mtime = std::fs::metadata(&self.cabal_path)
+            .and_then(|m| m.modified())
+            .ok();
         self.set_status("Reloaded from disk");
         Ok(())
     }
@@ -122,6 +336,9 @@ impl App {
         let rendered = self.parse_result.cst.render();
         std::fs::write(&self.cabal_path, &rendered)?;
         self.dirty = false;
+        self.last_file_mtime = std::fs::metadata(&self.cabal_path)
+            .and_then(|m| m.modified())
+            .ok();
         self.set_status("Saved");
         Ok(())
     }
@@ -389,12 +606,113 @@ impl App {
         if edits.is_empty() {
             return;
         }
+        // Push current state for undo.
+        self.undo_stack.push(self.source.clone());
+        if self.undo_stack.len() > MAX_UNDO_ENTRIES {
+            self.undo_stack.remove(0);
+        }
+
         let mut batch = EditBatch::new();
         batch.add_all(edits);
         self.source = batch.apply(&self.source);
         self.parse_result = cabalist_parser::parse(&self.source);
         self.refresh_lints();
         self.dirty = true;
+    }
+
+    /// Undo the last edit by restoring the previous source from the undo stack.
+    pub fn undo(&mut self) -> Result<(), String> {
+        let prev = self.undo_stack.pop().ok_or("Nothing to undo")?;
+        self.source = prev;
+        self.parse_result = cabalist_parser::parse(&self.source);
+        self.refresh_lints();
+        self.dirty = true;
+        self.set_status("Undone");
+        Ok(())
+    }
+
+    /// Check if the .cabal file has been modified externally, and reload if so.
+    ///
+    /// Does nothing if there are unsaved changes (dirty flag is set).
+    pub fn check_file_changed(&mut self) {
+        if self.dirty {
+            return; // Don't clobber unsaved changes.
+        }
+        let mtime = std::fs::metadata(&self.cabal_path)
+            .and_then(|m| m.modified())
+            .ok();
+        if mtime != self.last_file_mtime && self.last_file_mtime.is_some() && self.reload().is_ok()
+        {
+            self.set_status("File changed on disk -- reloaded");
+        }
+        self.last_file_mtime = mtime;
+    }
+
+    /// Start the init wizard (callable from the dashboard via 'i' key).
+    pub fn start_init_wizard(&mut self) {
+        self.init_wizard = Some(InitWizard::new());
+        self.current_view = View::Init;
+    }
+
+    /// Finalize the init wizard: render the template, write files, reload.
+    pub fn finalize_init(&mut self) -> Result<(), String> {
+        let wizard = self
+            .init_wizard
+            .as_ref()
+            .ok_or_else(|| "No init wizard active".to_string())?;
+
+        let module_name = to_module_name(&wizard.name);
+
+        let vars = cabalist_opinions::templates::TemplateVars {
+            name: wizard.name.clone(),
+            version: "0.1.0.0".to_string(),
+            synopsis: if wizard.synopsis.is_empty() {
+                "A short synopsis".to_string()
+            } else {
+                wizard.synopsis.clone()
+            },
+            description: "A longer description".to_string(),
+            license: wizard.license.clone(),
+            author: wizard.author.clone(),
+            maintainer: wizard.maintainer.clone(),
+            category: "Development".to_string(),
+            repo_url: String::new(),
+            language: "GHC2021".to_string(),
+            exposed_modules: module_name.clone(),
+        };
+
+        let template_kind = wizard.template;
+        let cabal_content = cabalist_opinions::templates::render_template(template_kind, &vars);
+
+        // Update the cabal path to use the project name.
+        let project_dir = self
+            .cabal_path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf();
+        let cabal_filename = format!("{}.cabal", wizard.name);
+        self.cabal_path = project_dir.join(&cabal_filename);
+
+        // Write the .cabal file.
+        std::fs::write(&self.cabal_path, &cabal_content)
+            .map_err(|e| format!("Failed to write .cabal file: {e}"))?;
+
+        // Create directories and stub files based on template kind.
+        create_project_dirs(&project_dir, template_kind, &wizard.name, &module_name)?;
+
+        // Reload the app from the new file.
+        self.source = cabal_content;
+        self.parse_result = cabalist_parser::parse(&self.source);
+        self.refresh_lints();
+        self.dirty = false;
+        self.last_file_mtime = std::fs::metadata(&self.cabal_path)
+            .and_then(|m| m.modified())
+            .ok();
+        self.init_wizard = None;
+        self.current_view = View::Dashboard;
+        self.set_status(&format!("Created project '{}'", vars.name));
+
+        Ok(())
     }
 
     /// Add a dependency to the currently selected component's build-depends.
@@ -599,6 +917,103 @@ fn deps_for_component_ast<'a>(ast: &CabalFile<'a>, idx: usize) -> Vec<&'a str> {
         ci += 1;
     }
     Vec::new()
+}
+
+/// Convert a kebab-case project name to a PascalCase module name.
+fn to_module_name(name: &str) -> String {
+    name.split('-')
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(c) => {
+                    let upper: String = c.to_uppercase().collect();
+                    format!("{upper}{}", chars.as_str())
+                }
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("")
+}
+
+/// Create project directories and stub files for a given template.
+fn create_project_dirs(
+    project_dir: &Path,
+    template: TemplateKind,
+    _project_name: &str,
+    module_name: &str,
+) -> Result<(), String> {
+    let mkdir = |dir: &Path| {
+        std::fs::create_dir_all(dir).map_err(|e| format!("Failed to create {}: {e}", dir.display()))
+    };
+
+    let write_if_missing = |path: &Path, content: &str| -> Result<(), String> {
+        if !path.exists() {
+            std::fs::write(path, content)
+                .map_err(|e| format!("Failed to write {}: {e}", path.display()))?;
+        }
+        Ok(())
+    };
+
+    let has_lib = matches!(
+        template,
+        TemplateKind::Library | TemplateKind::LibAndExe | TemplateKind::Full
+    );
+    let has_exe = matches!(
+        template,
+        TemplateKind::Application | TemplateKind::LibAndExe | TemplateKind::Full
+    );
+    let has_test = matches!(template, TemplateKind::Full);
+    let has_bench = matches!(template, TemplateKind::Full);
+
+    if has_lib {
+        let src = project_dir.join("src");
+        mkdir(&src)?;
+        let lib_file = src.join(format!("{module_name}.hs"));
+        write_if_missing(
+            &lib_file,
+            &format!(
+                "module {module_name}\n  ( someFunc\n  ) where\n\nsomeFunc :: IO ()\nsomeFunc = putStrLn \"someFunc\"\n"
+            ),
+        )?;
+    }
+
+    if has_exe {
+        let app_dir = project_dir.join("app");
+        mkdir(&app_dir)?;
+        let main_file = app_dir.join("Main.hs");
+        let main_content = if has_lib {
+            format!(
+                "module Main (main) where\n\nimport {module_name} (someFunc)\n\nmain :: IO ()\nmain = someFunc\n"
+            )
+        } else {
+            "module Main (main) where\n\nmain :: IO ()\nmain = putStrLn \"Hello, Haskell!\"\n"
+                .to_string()
+        };
+        write_if_missing(&main_file, &main_content)?;
+    }
+
+    if has_test {
+        let test_dir = project_dir.join("test");
+        mkdir(&test_dir)?;
+        let test_file = test_dir.join("Main.hs");
+        write_if_missing(
+            &test_file,
+            "module Main (main) where\n\nmain :: IO ()\nmain = putStrLn \"Test suite not yet implemented\"\n",
+        )?;
+    }
+
+    if has_bench {
+        let bench_dir = project_dir.join("bench");
+        mkdir(&bench_dir)?;
+        let bench_file = bench_dir.join("Main.hs");
+        write_if_missing(
+            &bench_file,
+            "module Main (main) where\n\nmain :: IO ()\nmain = putStrLn \"Benchmark not yet implemented\"\n",
+        )?;
+    }
+
+    Ok(())
 }
 
 /// Count dependencies in a component by index.

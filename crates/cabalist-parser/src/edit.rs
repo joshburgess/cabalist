@@ -557,15 +557,16 @@ fn add_item_trailing_comma(
     let indent = detect_item_indent(cst, field_node);
 
     if insert_idx >= items.len() {
-        // Append at end. Need to add comma to the current last item.
+        // Append at end in trailing-comma style.
         let last = &items[items.len() - 1];
         let last_span = last.1;
         let last_node_text = last.0.trim();
+        let last_has_comma = last_node_text.ends_with(',');
 
         let mut edits = Vec::new();
 
-        // Add trailing comma to the last item if it doesn't have one.
-        if !last_node_text.ends_with(',') {
+        // Add trailing comma to the current last item if it doesn't have one.
+        if !last_has_comma {
             let last_content_end = find_content_end_in_span(cst, last_span);
             edits.push(TextEdit {
                 range: Span::new(last_content_end, last_content_end),
@@ -573,10 +574,19 @@ fn add_item_trailing_comma(
             });
         }
 
+        // Add the new item. If the existing last item already had a trailing
+        // comma (meaning this style uses trailing commas on every line),
+        // add our new item with a trailing comma too for consistency.
+        let new_item = if last_has_comma {
+            format!("{indent}{item},\n")
+        } else {
+            format!("{indent}{item}\n")
+        };
+
         let end = field_value_end(cst, field_node);
         edits.push(TextEdit {
             range: Span::new(end, end),
-            replacement: format!("{indent}{item}\n"),
+            replacement: new_item,
         });
 
         edits
@@ -856,29 +866,37 @@ fn remove_item_trailing_comma(
     }
 
     if remove_idx == items.len() - 1 {
-        // Removing the last item. Also need to remove the trailing comma
-        // from the previous item.
+        // Removing the last item in trailing-comma style.
         let last_span = items[remove_idx].1;
-        let prev_text = &items[remove_idx - 1].0;
-        let prev_span = items[remove_idx - 1].1;
+        let last_text = &items[remove_idx].0;
+        let last_has_comma = last_text.trim().ends_with(',');
 
-        if prev_text.trim().ends_with(',') {
-            // Remove the comma from the previous item's content.
-            let content_end = find_content_end_in_span(cst, prev_span);
-            // The comma is the last character of the content.
-            return vec![
-                TextEdit {
-                    range: Span::new(content_end - 1, content_end),
-                    replacement: String::new(),
-                },
-                TextEdit {
-                    range: last_span,
-                    replacement: String::new(),
-                },
-            ];
+        if !last_has_comma && items.len() > 1 {
+            // The item we're removing has no trailing comma (it was added
+            // as the last item). The previous item had a comma added by
+            // the add operation to maintain trailing-comma style. We need
+            // to remove that comma to restore the original state.
+            let prev_text = &items[remove_idx - 1].0;
+            let prev_span = items[remove_idx - 1].1;
+
+            if prev_text.trim().ends_with(',') {
+                let content_end = find_content_end_in_span(cst, prev_span);
+                return vec![
+                    TextEdit {
+                        range: Span::new(content_end - 1, content_end),
+                        replacement: String::new(),
+                    },
+                    TextEdit {
+                        range: last_span,
+                        replacement: String::new(),
+                    },
+                ];
+            }
         }
 
-        // Previous item doesn't have trailing comma — just remove the line.
+        // Either the last item has a trailing comma (original style had
+        // trailing commas on every item), or there's no previous item.
+        // Just remove the line.
         return vec![TextEdit {
             range: last_span,
             replacement: String::new(),

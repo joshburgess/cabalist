@@ -67,6 +67,11 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         View::Metadata => {
             lines.push(help_line(theme, "Enter", "Edit selected field"));
         }
+        View::Init => {
+            lines.push(help_line(theme, "Enter", "Confirm / next step"));
+            lines.push(help_line(theme, "Esc", "Go back / cancel"));
+            lines.push(help_line(theme, "Tab", "Cycle option"));
+        }
     }
 
     lines.push(Line::default());

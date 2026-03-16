@@ -9,7 +9,10 @@ mod widgets;
 
 use app::App;
 use clap::Parser;
-use crossterm::event::{Event as CrosstermEvent, KeyEventKind};
+use crossterm::event::{
+    DisableMouseCapture, EnableMouseCapture, Event as CrosstermEvent, KeyEventKind, MouseButton,
+    MouseEvent, MouseEventKind,
+};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
@@ -42,35 +45,53 @@ struct Cli {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    // Find the .cabal file.
-    let cabal_path = match cli.file {
-        Some(path) => {
-            if !path.exists() {
-                anyhow::bail!("File not found: {}", path.display());
-            }
-            path
-        }
-        None => find_cabal_file()?,
-    };
-
     let theme = match cli.theme.as_str() {
         "light" => theme::Theme::light(),
         _ => theme::Theme::dark(),
     };
 
-    let mut app = App::new(cabal_path, theme)?;
+    // Find or determine the .cabal file path.
+    let (cabal_path, init_mode) = match cli.file {
+        Some(path) => {
+            if !path.exists() {
+                anyhow::bail!("File not found: {}", path.display());
+            }
+            (path, false)
+        }
+        None => match find_cabal_file() {
+            Ok(path) => (path, false),
+            Err(_) => {
+                // No .cabal file found — start in init wizard mode.
+                let cwd = std::env::current_dir()?;
+                let dir_name = cwd
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "new-project".to_string());
+                (cwd.join(format!("{dir_name}.cabal")), true)
+            }
+        },
+    };
+
+    let mut app = if init_mode {
+        App::new_for_init(cabal_path, theme)?
+    } else {
+        App::new(cabal_path, theme)?
+    };
 
     // Set up a panic hook that restores the terminal before printing the
     // panic message.
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
         let _ = disable_raw_mode();
+        let _ = stdout().execute(DisableMouseCapture);
         let _ = stdout().execute(LeaveAlternateScreen);
         original_hook(panic_info);
     }));
 
-    // Enter alternate screen and raw mode.
-    stdout().execute(EnterAlternateScreen)?;
+    // Enter alternate screen, raw mode, and enable mouse capture.
+    stdout()
+        .execute(EnterAlternateScreen)?
+        .execute(EnableMouseCapture)?;
     enable_raw_mode()?;
 
     let backend = ratatui::backend::CrosstermBackend::new(stdout());
@@ -96,6 +117,9 @@ async fn main() -> anyhow::Result<()> {
                 let action = input::handle_key(&app, key);
                 handle_action(&mut app, action);
             }
+            AppEvent::Terminal(CrosstermEvent::Mouse(mouse)) => {
+                handle_mouse(&mut app, mouse);
+            }
             AppEvent::Terminal(CrosstermEvent::Resize(_, _)) => {
                 // Terminal will re-render on next iteration.
             }
@@ -106,6 +130,8 @@ async fn main() -> anyhow::Result<()> {
                         app.status_message = None;
                     }
                 }
+                // Check for external file changes.
+                app.check_file_changed();
             }
             _ => {}
         }
@@ -120,7 +146,9 @@ async fn main() -> anyhow::Result<()> {
 
     // Restore terminal.
     disable_raw_mode()?;
-    stdout().execute(LeaveAlternateScreen)?;
+    stdout()
+        .execute(DisableMouseCapture)?
+        .execute(LeaveAlternateScreen)?;
 
     Ok(())
 }
@@ -149,6 +177,7 @@ fn render(frame: &mut ratatui::Frame, app: &App) {
             views::dashboard::render(frame, app, chunks[1]);
             views::help::render(frame, app, chunks[1]);
         }
+        View::Init => views::init::render(frame, app, chunks[1]),
     }
 
     widgets::status_bar::render(frame, app, chunks[2]);
@@ -180,6 +209,11 @@ fn handle_action(app: &mut App, action: Action) {
         Action::Reload => {
             if let Err(e) = app.reload() {
                 app.set_status(&format!("Reload failed: {e}"));
+            }
+        }
+        Action::Undo => {
+            if let Err(e) = app.undo() {
+                app.set_status(&e);
             }
         }
         Action::MoveUp => {
@@ -325,6 +359,122 @@ fn handle_action(app: &mut App, action: Action) {
                 app.current_view = View::Help;
             }
         }
+        Action::StartInit => {
+            app.start_init_wizard();
+        }
+        Action::InitInput(c) => {
+            if let Some(ref mut wizard) = app.init_wizard {
+                wizard.input_buffer.push(c);
+            }
+        }
+        Action::InitBackspace => {
+            if let Some(ref mut wizard) = app.init_wizard {
+                wizard.input_buffer.pop();
+            }
+        }
+        Action::InitConfirm => {
+            // Commit input and advance to next step, or finalize on Confirm.
+            let at_confirm = app
+                .init_wizard
+                .as_ref()
+                .map(|w| w.step == app::InitStep::Confirm)
+                .unwrap_or(false);
+
+            if at_confirm {
+                match app.finalize_init() {
+                    Ok(()) => {} // status set inside finalize_init
+                    Err(e) => app.set_status(&format!("Init failed: {e}")),
+                }
+            } else if let Some(ref mut wizard) = app.init_wizard {
+                wizard.commit_input();
+                if let Some(next) = wizard.step.next() {
+                    wizard.step = next;
+                    wizard.load_input();
+                }
+            }
+        }
+        Action::InitBack => {
+            let should_quit_init = app
+                .init_wizard
+                .as_ref()
+                .map(|w| w.step == app::InitStep::Name)
+                .unwrap_or(false);
+
+            if should_quit_init {
+                // On first step, Esc exits the wizard.
+                app.init_wizard = None;
+                // If we started in init mode (empty source), quit entirely.
+                if app.source.is_empty() {
+                    app.should_quit = true;
+                } else {
+                    app.current_view = View::Dashboard;
+                }
+            } else if let Some(ref mut wizard) = app.init_wizard {
+                wizard.commit_input();
+                if let Some(prev) = wizard.step.prev() {
+                    wizard.step = prev;
+                    wizard.load_input();
+                }
+            }
+        }
+        Action::InitCycleOption => {
+            if let Some(ref mut wizard) = app.init_wizard {
+                wizard.cycle_template();
+            }
+        }
+    }
+}
+
+/// Handle mouse events: click to select in lists, scroll wheel to navigate.
+fn handle_mouse(app: &mut App, event: MouseEvent) {
+    match event.kind {
+        MouseEventKind::Down(MouseButton::Left) => {
+            // Click on list items to select them.
+            // The main content area starts at row 1 (after header).
+            // List items typically start around row 3-4 (inside a bordered block).
+            let row = event.row as usize;
+
+            match app.current_view {
+                View::Dependencies | View::Extensions | View::Metadata => {
+                    // The bordered block starts at row 1 (header takes row 0),
+                    // the block title/border takes 1 row, so items start ~row 3.
+                    let list_start_row = 3;
+                    if row >= list_start_row {
+                        let list_idx = row - list_start_row;
+                        let max = app.current_list_len().saturating_sub(1);
+                        app.selected_index = list_idx.min(max);
+                    }
+                }
+                _ => {}
+            }
+        }
+        MouseEventKind::ScrollUp => {
+            if app.current_view == View::Build {
+                // Scroll build output up.
+                if app.build_scroll > 0 {
+                    app.build_scroll -= 1;
+                }
+            } else if app.selected_index > 0 {
+                app.selected_index -= 1;
+            }
+        }
+        MouseEventKind::ScrollDown => {
+            if app.current_view == View::Build {
+                // Scroll build output down.
+                app.build_scroll = app.build_scroll.saturating_add(1);
+                // Clamp to valid range.
+                let max_scroll = app.build_output.len();
+                if app.build_scroll > max_scroll {
+                    app.build_scroll = max_scroll;
+                }
+            } else {
+                let max = app.current_list_len().saturating_sub(1);
+                if app.selected_index < max {
+                    app.selected_index += 1;
+                }
+            }
+        }
+        _ => {}
     }
 }
 

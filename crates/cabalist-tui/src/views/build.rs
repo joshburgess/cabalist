@@ -39,9 +39,17 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
             theme.muted_style(),
         )));
     } else {
-        // Show the last N lines that fit in the terminal.
-        let start = app.build_output.len().saturating_sub(max_lines);
-        for line in &app.build_output[start..] {
+        // If the user has scrolled, use the scroll offset; otherwise
+        // auto-scroll to the bottom (follow mode).
+        let total = app.build_output.len();
+        let auto_start = total.saturating_sub(max_lines);
+        let start = if app.build_scroll > 0 && app.build_scroll < auto_start {
+            app.build_scroll
+        } else {
+            auto_start
+        };
+        let end = (start + max_lines).min(total);
+        for line in &app.build_output[start..end] {
             let style = if line.contains("error") || line.contains("Error") {
                 theme.error_style()
             } else if line.contains("warning") || line.contains("Warning") {

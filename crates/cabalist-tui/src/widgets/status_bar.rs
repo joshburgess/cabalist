@@ -28,12 +28,13 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     let keybindings = match app.current_view {
-        View::Dashboard => " [d]eps  [e]xt  [b]uild  [m]eta  [?]help  [q]uit",
+        View::Dashboard => " [d]eps  [e]xt  [b]uild  [m]eta  [i]nit  [?]help  [q]uit",
         View::Dependencies => " [a]dd  [r]emove  [/]search  [Tab]component  [Esc]back  [?]help",
         View::Extensions => " [Space]toggle  [/]search  [i]nfo  [Tab]component  [Esc]back  [?]help",
         View::Build => " [b]uild  [t]est  [c]lean  [Esc]back  [?]help",
         View::Metadata => " [j/k]navigate  [Esc]back  [?]help",
         View::Help => " Press any key to close",
+        View::Init => " [Enter]next  [Esc]back  [Tab]cycle option  [Ctrl+C]quit",
     };
 
     let padding = area.width.saturating_sub(keybindings.len() as u16);

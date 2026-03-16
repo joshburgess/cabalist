@@ -16,6 +16,8 @@ pub enum Action {
     Save,
     /// Reload the .cabal file from disk.
     Reload,
+    /// Undo the last edit.
+    Undo,
     /// Move selection up.
     MoveUp,
     /// Move selection down.
@@ -54,10 +56,27 @@ pub enum Action {
     Clean,
     /// Show the help overlay.
     ShowHelp,
+    /// Start the init wizard.
+    StartInit,
+    /// Init wizard: type a character into the input buffer.
+    InitInput(char),
+    /// Init wizard: delete a character from the input buffer.
+    InitBackspace,
+    /// Init wizard: confirm current step / advance.
+    InitConfirm,
+    /// Init wizard: go back to previous step.
+    InitBack,
+    /// Init wizard: cycle option (for Template step).
+    InitCycleOption,
 }
 
 /// Map a key event to an action based on current app state.
 pub fn handle_key(app: &App, key: KeyEvent) -> Action {
+    // If the init wizard is active, route to init key handler.
+    if app.current_view == View::Init && app.init_wizard.is_some() {
+        return handle_init_key(app, key);
+    }
+
     // If search is active, route most keys to search input.
     if app.search_active {
         return handle_search_key(key);
@@ -68,6 +87,7 @@ pub fn handle_key(app: &App, key: KeyEvent) -> Action {
         (KeyModifiers::CONTROL, KeyCode::Char('c')) => return Action::Quit,
         (KeyModifiers::CONTROL, KeyCode::Char('s')) => return Action::Save,
         (KeyModifiers::CONTROL, KeyCode::Char('r')) => return Action::Reload,
+        (KeyModifiers::CONTROL, KeyCode::Char('z')) => return Action::Undo,
         _ => {}
     }
 
@@ -101,6 +121,7 @@ fn handle_view_key(app: &App, key: KeyEvent) -> Action {
             // Any key closes the help overlay.
             Action::Back
         }
+        View::Init => Action::None, // handled above
     }
 }
 
@@ -110,6 +131,7 @@ fn handle_dashboard_key(key: KeyEvent) -> Action {
         KeyCode::Char('e') => Action::SwitchView(View::Extensions),
         KeyCode::Char('b') => Action::SwitchView(View::Build),
         KeyCode::Char('m') => Action::SwitchView(View::Metadata),
+        KeyCode::Char('i') => Action::StartInit,
         _ => Action::None,
     }
 }
@@ -145,6 +167,45 @@ fn handle_search_key(key: KeyEvent) -> Action {
         KeyCode::Enter => Action::Select,
         KeyCode::Backspace => Action::SearchBackspace,
         KeyCode::Char(c) => Action::SearchInput(c),
+        _ => Action::None,
+    }
+}
+
+fn handle_init_key(app: &App, key: KeyEvent) -> Action {
+    // Ctrl+C always quits.
+    if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('c') {
+        return Action::Quit;
+    }
+
+    let wizard = match app.init_wizard.as_ref() {
+        Some(w) => w,
+        None => return Action::None,
+    };
+
+    match key.code {
+        KeyCode::Esc => Action::InitBack,
+        KeyCode::Enter => Action::InitConfirm,
+        KeyCode::Tab => {
+            if wizard.step == crate::app::InitStep::Template {
+                Action::InitCycleOption
+            } else {
+                Action::None
+            }
+        }
+        KeyCode::Backspace => {
+            if wizard.editing {
+                Action::InitBackspace
+            } else {
+                Action::None
+            }
+        }
+        KeyCode::Char(c) => {
+            if wizard.editing {
+                Action::InitInput(c)
+            } else {
+                Action::None
+            }
+        }
         _ => Action::None,
     }
 }
