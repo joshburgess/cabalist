@@ -170,11 +170,12 @@ fn detect_context(source: &str, offset: usize) -> CompletionContext {
     // If the line is empty or only whitespace, offer field names or section keywords.
     if trimmed.is_empty() {
         if indent == 0 {
-            // Top-level: could be a field name or section keyword.
-            // Offer both, but section keywords are more likely.
             return CompletionContext::SectionKeyword;
         } else {
-            // Inside a section.
+            // Check if this indented empty line is a continuation of a field value.
+            if let Some(field_name) = find_parent_field_name(source, line_start) {
+                return CompletionContext::FieldValue { field_name };
+            }
             return CompletionContext::FieldName { in_section: true };
         }
     }
@@ -337,4 +338,126 @@ fn warning_completions() -> Vec<CompletionItem> {
             ..Default::default()
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::DocumentState;
+
+    fn make_doc(source: &str) -> DocumentState {
+        DocumentState::new(source.to_string(), 1)
+    }
+
+    /// Helper: get completion labels at a byte offset in the source.
+    fn labels_at(source: &str, offset: usize) -> Vec<String> {
+        let doc = make_doc(source);
+        let pos = doc.line_index.offset_to_position(offset);
+        let items = completions(&doc, pos, None);
+        items.into_iter().map(|i| i.label).collect()
+    }
+
+    #[test]
+    fn top_level_empty_line_offers_section_keywords() {
+        let source = "cabal-version: 3.0\nname: foo\n\n";
+        // Cursor at the empty line (offset 30 = start of blank line).
+        let labels = labels_at(source, 30);
+        assert!(labels.contains(&"library".to_string()));
+        assert!(labels.contains(&"executable".to_string()));
+    }
+
+    #[test]
+    fn indented_empty_line_offers_section_fields() {
+        let source = "cabal-version: 3.0\n\nlibrary\n  \n";
+        // Cursor at the indented empty line inside the library section.
+        let offset = source.rfind("  \n").unwrap() + 2;
+        let labels = labels_at(source, offset);
+        assert!(labels.contains(&"build-depends:".to_string()));
+        assert!(labels.contains(&"exposed-modules:".to_string()));
+    }
+
+    #[test]
+    fn default_extensions_value_offers_ghc_extensions() {
+        let source = "library\n  default-extensions: ";
+        let offset = source.len();
+        let labels = labels_at(source, offset);
+        assert!(labels.contains(&"OverloadedStrings".to_string()));
+        assert!(labels.contains(&"DerivingStrategies".to_string()));
+    }
+
+    #[test]
+    fn ghc_options_value_offers_warning_flags() {
+        let source = "library\n  ghc-options: ";
+        let offset = source.len();
+        let labels = labels_at(source, offset);
+        assert!(labels.iter().any(|l| l.starts_with("-W")));
+    }
+
+    #[test]
+    fn default_language_value_offers_languages() {
+        let source = "library\n  default-language: ";
+        let offset = source.len();
+        let labels = labels_at(source, offset);
+        assert!(labels.contains(&"GHC2021".to_string()));
+        assert!(labels.contains(&"Haskell2010".to_string()));
+    }
+
+    #[test]
+    fn license_value_offers_spdx() {
+        let source = "license: ";
+        let offset = source.len();
+        let labels = labels_at(source, offset);
+        assert!(labels.contains(&"MIT".to_string()));
+        assert!(labels.contains(&"BSD-3-Clause".to_string()));
+    }
+
+    #[test]
+    fn build_type_value_offers_types() {
+        let source = "build-type: ";
+        let offset = source.len();
+        let labels = labels_at(source, offset);
+        assert!(labels.contains(&"Simple".to_string()));
+        assert!(labels.contains(&"Custom".to_string()));
+    }
+
+    #[test]
+    fn after_if_keyword_offers_conditions() {
+        let source = "library\n  if ";
+        let offset = source.len();
+        let labels = labels_at(source, offset);
+        assert!(labels.contains(&"flag(".to_string()));
+        assert!(labels.contains(&"os(".to_string()));
+    }
+
+    #[test]
+    fn continuation_line_inherits_parent_field() {
+        let source = "library\n  default-extensions:\n    OverloadedStrings\n    ";
+        let offset = source.len();
+        let labels = labels_at(source, offset);
+        // Should offer extensions, not field names.
+        assert!(labels.contains(&"DerivingStrategies".to_string()));
+    }
+
+    #[test]
+    fn extension_completions_have_documentation() {
+        let items = extension_completions();
+        let overloaded = items.iter().find(|i| i.label == "OverloadedStrings");
+        assert!(overloaded.is_some());
+        assert!(overloaded.unwrap().detail.is_some());
+        assert!(overloaded.unwrap().documentation.is_some());
+    }
+
+    #[test]
+    fn context_detection_field_value_after_colon() {
+        let source = "name: ";
+        let ctx = detect_context(source, 6);
+        assert!(matches!(ctx, CompletionContext::FieldValue { field_name } if field_name == "name"));
+    }
+
+    #[test]
+    fn context_detection_section_keyword_at_col0() {
+        let source = "lib";
+        let ctx = detect_context(source, 3);
+        assert!(matches!(ctx, CompletionContext::SectionKeyword));
+    }
 }

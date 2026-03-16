@@ -219,6 +219,11 @@ fn word_at_offset(source: &str, offset: usize) -> Option<String> {
     let bytes = source.as_bytes();
     let is_word_char = |b: u8| !b.is_ascii_whitespace() && b != b',' && b != b'(' && b != b')';
 
+    // If the cursor is not on a word character, no word here.
+    if !is_word_char(bytes[offset]) {
+        return None;
+    }
+
     // Find word start.
     let mut start = offset;
     while start > 0 && is_word_char(bytes[start - 1]) {
@@ -255,4 +260,120 @@ fn find_parent_field(source: &str, from: usize) -> Option<String> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::DocumentState;
+    use tower_lsp::lsp_types::Position;
+
+    fn make_doc(source: &str) -> DocumentState {
+        DocumentState::new(source.to_string(), 1)
+    }
+
+    /// Helper: get hover content at a byte offset.
+    fn hover_at(source: &str, offset: usize) -> Option<String> {
+        let doc = make_doc(source);
+        let pos = doc.line_index.offset_to_position(offset);
+        let result = hover(&doc, pos, None);
+        result.map(|h| match h.contents {
+            HoverContents::Markup(m) => m.value,
+            _ => String::new(),
+        })
+    }
+
+    #[test]
+    fn hover_on_field_name() {
+        let source = "name: foo\n";
+        // Hover on "name" (offset 0-4).
+        let content = hover_at(source, 2);
+        assert!(content.is_some());
+        let text = content.unwrap();
+        assert!(text.contains("**name**"));
+        assert!(text.contains("package name"));
+    }
+
+    #[test]
+    fn hover_on_build_depends_field() {
+        let source = "library\n  build-depends: base\n";
+        // Hover on "build-depends" field name.
+        let offset = source.find("build-depends").unwrap() + 3;
+        let content = hover_at(source, offset);
+        assert!(content.is_some());
+        assert!(content.unwrap().contains("**build-depends**"));
+    }
+
+    #[test]
+    fn hover_on_extension_name() {
+        let source = "library\n  default-extensions: OverloadedStrings\n";
+        let offset = source.find("OverloadedStrings").unwrap() + 5;
+        let content = hover_at(source, offset);
+        assert!(content.is_some());
+        let text = content.unwrap();
+        assert!(text.contains("**OverloadedStrings**"));
+        assert!(text.contains("Since GHC"));
+    }
+
+    #[test]
+    fn hover_on_warning_flag() {
+        let source = "library\n  ghc-options: -Wall\n";
+        let offset = source.find("-Wall").unwrap() + 2;
+        let content = hover_at(source, offset);
+        assert!(content.is_some());
+        let text = content.unwrap();
+        assert!(text.contains("**-Wall**"));
+    }
+
+    #[test]
+    fn hover_on_extension_continuation_line() {
+        let source = "library\n  default-extensions:\n    OverloadedStrings\n    DerivingStrategies\n";
+        let offset = source.find("DerivingStrategies").unwrap() + 3;
+        let content = hover_at(source, offset);
+        assert!(content.is_some());
+        assert!(content.unwrap().contains("**DerivingStrategies**"));
+    }
+
+    #[test]
+    fn hover_on_unknown_extension_returns_none() {
+        let source = "library\n  default-extensions: NotARealExtension\n";
+        let offset = source.find("NotARealExtension").unwrap() + 3;
+        let content = hover_at(source, offset);
+        assert!(content.is_none());
+    }
+
+    #[test]
+    fn hover_on_empty_space_returns_none() {
+        let source = "name: foo\n\n";
+        let content = hover_at(source, 10); // the blank line
+        assert!(content.is_none());
+    }
+
+    #[test]
+    fn word_at_offset_basic() {
+        assert_eq!(word_at_offset("hello world", 3), Some("hello".into()));
+        assert_eq!(word_at_offset("hello world", 7), Some("world".into()));
+        assert_eq!(word_at_offset("hello world", 5), None); // on the space
+    }
+
+    #[test]
+    fn word_at_offset_with_commas() {
+        assert_eq!(word_at_offset("base, text", 1), Some("base".into()));
+        assert_eq!(word_at_offset("base, text", 6), Some("text".into()));
+    }
+
+    #[test]
+    fn find_parent_field_basic() {
+        let source = "library\n  build-depends:\n    base\n    ";
+        let from = source.rfind("    ").unwrap();
+        assert_eq!(find_parent_field(source, from), Some("build-depends".into()));
+    }
+
+    #[test]
+    fn find_parent_field_stops_at_section() {
+        let source = "library\n  exposed-modules: Foo\n";
+        let from = source.len();
+        // Looking from end, should find exposed-modules.
+        assert_eq!(find_parent_field(source, from), Some("exposed-modules".into()));
+    }
 }

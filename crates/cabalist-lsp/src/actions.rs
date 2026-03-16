@@ -168,6 +168,28 @@ fn make_edit_action(
     }
 }
 
+/// Check if a code action would be generated for a given lint ID.
+#[cfg(test)]
+fn has_action_for_lint(lint_id: &str) -> bool {
+    let source = "cabal-version: 2.4\nname: test\nversion: 0.1\n\nlibrary\n  exposed-modules: Lib\n  build-depends: base ^>=4.17\n";
+    let doc = crate::state::DocumentState::new(source.to_string(), 1);
+    let uri = Url::parse("file:///test.cabal").unwrap();
+
+    let diag = Diagnostic {
+        range: Range {
+            start: Position { line: 0, character: 0 },
+            end: Position { line: 0, character: 10 },
+        },
+        severity: Some(DiagnosticSeverity::WARNING),
+        source: Some("cabalist".into()),
+        code: Some(NumberOrString::String(lint_id.to_string())),
+        message: "test".to_string(),
+        ..Default::default()
+    };
+
+    action_for_lint(&doc, &uri, Path::new("."), &diag, lint_id).is_some()
+}
+
 fn make_replace_action(
     title: &str,
     uri: &Url,
@@ -193,5 +215,94 @@ fn make_replace_action(
         }),
         is_preferred: Some(true),
         ..Default::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn action_exists_for_missing_default_language() {
+        assert!(has_action_for_lint("missing-default-language"));
+    }
+
+    #[test]
+    fn action_exists_for_missing_synopsis() {
+        assert!(has_action_for_lint("missing-synopsis"));
+    }
+
+    #[test]
+    fn action_exists_for_missing_description() {
+        assert!(has_action_for_lint("missing-description"));
+    }
+
+    #[test]
+    fn action_exists_for_missing_bug_reports() {
+        assert!(has_action_for_lint("missing-bug-reports"));
+    }
+
+    #[test]
+    fn action_exists_for_cabal_version_low() {
+        assert!(has_action_for_lint("cabal-version-low"));
+    }
+
+    #[test]
+    fn no_action_for_unknown_lint() {
+        assert!(!has_action_for_lint("some-unknown-lint"));
+    }
+
+    #[test]
+    fn code_actions_filters_by_source() {
+        let source = "cabal-version: 3.0\nname: test\nversion: 0.1\n";
+        let doc = crate::state::DocumentState::new(source.to_string(), 1);
+        let uri = Url::parse("file:///test.cabal").unwrap();
+
+        let non_cabalist_diag = Diagnostic {
+            source: Some("other-tool".into()),
+            code: Some(NumberOrString::String("missing-synopsis".into())),
+            message: "test".into(),
+            ..Default::default()
+        };
+
+        let context = CodeActionContext {
+            diagnostics: vec![non_cabalist_diag],
+            ..Default::default()
+        };
+
+        let range = Range::default();
+        let actions = code_actions(&doc, &uri, Path::new("."), &range, &context);
+        assert!(actions.is_empty(), "should ignore non-cabalist diagnostics");
+    }
+
+    #[test]
+    fn cabal_version_low_action_has_workspace_edit() {
+        let source = "cabal-version: 2.4\nname: test\nversion: 0.1\n";
+        let doc = crate::state::DocumentState::new(source.to_string(), 1);
+        let uri = Url::parse("file:///test.cabal").unwrap();
+
+        let diag = Diagnostic {
+            range: Range {
+                start: Position { line: 0, character: 0 },
+                end: Position { line: 0, character: 18 },
+            },
+            source: Some("cabalist".into()),
+            code: Some(NumberOrString::String("cabal-version-low".into())),
+            message: "cabal-version is 2.4".into(),
+            ..Default::default()
+        };
+
+        let action = action_for_lint(&doc, &uri, Path::new("."), &diag, "cabal-version-low");
+        assert!(action.is_some());
+        let action = action.unwrap();
+        assert!(action.edit.is_some(), "should have a workspace edit");
+        let edit = action.edit.unwrap();
+        let changes = edit.changes.unwrap();
+        let edits = changes.get(&uri).unwrap();
+        assert!(!edits.is_empty());
+        assert!(
+            edits[0].new_text.contains("3.0"),
+            "replacement should contain 3.0"
+        );
     }
 }
