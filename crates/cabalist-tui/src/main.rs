@@ -422,7 +422,54 @@ fn handle_action(app: &mut App, action: Action) {
                 wizard.cycle_template();
             }
         }
+        Action::NextDiagnostic => {
+            if !app.build_diagnostics.is_empty() {
+                app.selected_diagnostic =
+                    (app.selected_diagnostic + 1) % app.build_diagnostics.len();
+                scroll_to_diagnostic(app);
+            } else {
+                app.set_status("No diagnostics to navigate");
+            }
+        }
+        Action::PrevDiagnostic => {
+            if !app.build_diagnostics.is_empty() {
+                if app.selected_diagnostic == 0 {
+                    app.selected_diagnostic = app.build_diagnostics.len() - 1;
+                } else {
+                    app.selected_diagnostic -= 1;
+                }
+                scroll_to_diagnostic(app);
+            } else {
+                app.set_status("No diagnostics to navigate");
+            }
+        }
     }
+}
+
+/// Scroll the build output so the currently selected diagnostic's line is visible.
+fn scroll_to_diagnostic(app: &mut App) {
+    let diag = &app.build_diagnostics[app.selected_diagnostic];
+    let pattern = format!("{}:{}:{}", diag.file, diag.line, diag.column);
+
+    // Find the line index in build_output that contains this diagnostic header.
+    if let Some(line_idx) = app
+        .build_output
+        .iter()
+        .position(|line| line.contains(&pattern))
+    {
+        app.build_scroll = line_idx;
+    }
+
+    let severity = match diag.severity {
+        cabalist_cabal::GhcSeverity::Error => "error",
+        cabalist_cabal::GhcSeverity::Warning => "warning",
+    };
+    let total = app.build_diagnostics.len();
+    let current = app.selected_diagnostic + 1;
+    app.set_status(&format!(
+        "[{current}/{total}] {severity}: {}:{}:{} {}",
+        diag.file, diag.line, diag.column, diag.message
+    ));
 }
 
 /// Handle mouse events: click to select in lists, scroll wheel to navigate.

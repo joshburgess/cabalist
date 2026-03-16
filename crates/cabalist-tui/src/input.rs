@@ -68,6 +68,10 @@ pub enum Action {
     InitBack,
     /// Init wizard: cycle option (for Template step).
     InitCycleOption,
+    /// Navigate to the next build diagnostic.
+    NextDiagnostic,
+    /// Navigate to the previous build diagnostic.
+    PrevDiagnostic,
 }
 
 /// Map a key event to an action based on current app state.
@@ -157,6 +161,8 @@ fn handle_build_key(key: KeyEvent) -> Action {
         KeyCode::Char('b') => Action::Build,
         KeyCode::Char('t') => Action::Test,
         KeyCode::Char('c') => Action::Clean,
+        KeyCode::Char('n') | KeyCode::Char(']') => Action::NextDiagnostic,
+        KeyCode::Char('p') | KeyCode::Char('[') => Action::PrevDiagnostic,
         _ => Action::None,
     }
 }
