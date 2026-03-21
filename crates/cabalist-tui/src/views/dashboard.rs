@@ -290,7 +290,7 @@ fn count_outdated_deps(app: &App) -> usize {
             components: latest.components.clone(),
         };
         let is_outdated = match &dep.version_range {
-            Some(vr) => !crate::views::deps::version_satisfies_range_pub(&parser_version, vr),
+            Some(vr) => !cabalist_parser::ast::version_satisfies(&parser_version, vr),
             None => false,
         };
         if is_outdated {

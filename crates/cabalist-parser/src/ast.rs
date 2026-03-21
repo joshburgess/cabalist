@@ -133,6 +133,77 @@ impl std::fmt::Display for VersionRange {
     }
 }
 
+impl VersionRange {
+    /// Check if a version satisfies this version range.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cabalist_parser::ast::{Version, VersionRange};
+    ///
+    /// let v = Version { components: vec![4, 17, 0, 0] };
+    /// let range = VersionRange::MajorBound(Version { components: vec![4, 17] });
+    /// assert!(range.satisfies(&v));
+    ///
+    /// let too_new = Version { components: vec![4, 18, 0, 0] };
+    /// assert!(!range.satisfies(&too_new));
+    /// ```
+    pub fn satisfies(&self, version: &Version) -> bool {
+        version_satisfies(version, self)
+    }
+}
+
+/// Check if a version satisfies a version range (best-effort).
+///
+/// This implements PVP-aware version comparison for all constraint operators.
+pub fn version_satisfies(version: &Version, vr: &VersionRange) -> bool {
+    use std::cmp::Ordering;
+
+    let cmp_versions =
+        |a: &Version, b: &Version| -> Ordering {
+            let max_len = a.components.len().max(b.components.len());
+            for i in 0..max_len {
+                let ac = a.components.get(i).copied().unwrap_or(0);
+                let bc = b.components.get(i).copied().unwrap_or(0);
+                match ac.cmp(&bc) {
+                    Ordering::Equal => continue,
+                    other => return other,
+                }
+            }
+            Ordering::Equal
+        };
+
+    match vr {
+        VersionRange::Any => true,
+        VersionRange::NoVersion => false,
+        VersionRange::Eq(v) => cmp_versions(version, v) == Ordering::Equal,
+        VersionRange::Gt(v) => cmp_versions(version, v) == Ordering::Greater,
+        VersionRange::Gte(v) => cmp_versions(version, v) != Ordering::Less,
+        VersionRange::Lt(v) => cmp_versions(version, v) == Ordering::Less,
+        VersionRange::Lte(v) => cmp_versions(version, v) != Ordering::Greater,
+        VersionRange::MajorBound(v) => {
+            // ^>=X.Y means >=X.Y && <X.(Y+1)
+            if cmp_versions(version, v) == Ordering::Less {
+                return false;
+            }
+            let mut upper = v.clone();
+            if upper.components.len() >= 2 {
+                upper.components[1] += 1;
+                upper.components.truncate(2);
+            } else if upper.components.len() == 1 {
+                upper.components[0] += 1;
+            }
+            cmp_versions(version, &upper) == Ordering::Less
+        }
+        VersionRange::And(a, b) => {
+            version_satisfies(version, a) && version_satisfies(version, b)
+        }
+        VersionRange::Or(a, b) => {
+            version_satisfies(version, a) || version_satisfies(version, b)
+        }
+    }
+}
+
 /// Parse a version range string.
 ///
 /// Handles expressions like:

@@ -120,30 +120,17 @@ fn action_for_lint(
             ))
         }
         "missing-upper-bound" => {
-            // The diagnostic message contains the package name and current constraint.
-            // Extract the package name from: "Dependency 'pkg' has no upper version bound (>=X.Y)"
-            let pkg_name = diag.message
-                .find('\'')
-                .and_then(|start| {
-                    let rest = &diag.message[start + 1..];
-                    rest.find('\'').map(|end| &rest[..end])
-                });
-            let Some(pkg_name) = pkg_name else {
-                return None;
-            };
+            // Use structured data from diagnostic if available, fall back to message parsing.
+            let (pkg_name, constraint) = extract_dep_data(diag);
+            let pkg_name = pkg_name?;
 
-            // Find the dependency in the CST and replace its version range with ^>=.
-            // Extract the lower bound version from the diagnostic message.
-            let lower_version = diag.message
-                .find("(>=")
-                .map(|start| {
-                    let rest = &diag.message[start + 3..];
-                    rest.find(')').map(|end| rest[..end].trim().to_string())
-                })
-                .flatten();
+            // Extract the lower bound version from the constraint (e.g., ">=4.17" -> "4.17").
+            let lower_version = constraint
+                .as_deref()
+                .and_then(|c| c.strip_prefix(">="))
+                .map(|v| v.trim().to_string());
 
             if let Some(version) = lower_version {
-                // Replace the version constraint at the diagnostic range with ^>= bounds.
                 Some(make_replace_action(
                     &format!("Add PVP upper bound: ^>={version}"),
                     uri,
@@ -176,17 +163,14 @@ fn action_for_lint(
             ))
         }
         "missing-lower-bound" => {
-            // Extract package name from: "Dependency 'pkg' has no lower version bound (<X.Y)."
-            let pkg_name = extract_quoted_name(&diag.message)?;
+            let (pkg_name, constraint) = extract_dep_data(diag);
+            let pkg_name = pkg_name?;
 
-            // Extract the upper bound version from the constraint in parens.
-            let upper_version = diag.message
-                .find("(<")
-                .map(|start| {
-                    let rest = &diag.message[start + 2..];
-                    rest.find(')').map(|end| rest[..end].trim().to_string())
-                })
-                .flatten();
+            // Extract version from constraint (e.g., "<5" -> "5").
+            let upper_version = constraint
+                .as_deref()
+                .and_then(|c| c.strip_prefix("<"))
+                .map(|v| v.trim().to_string());
 
             if let Some(version) = upper_version {
                 Some(make_replace_action(
@@ -201,10 +185,8 @@ fn action_for_lint(
             }
         }
         "wide-any-version" => {
-            // The package has no meaningful constraint. We can't know the right version
-            // without Hackage, so suggest the user add bounds manually.
-            // We still offer to add a placeholder ^>=0.1 constraint.
-            let pkg_name = extract_quoted_name(&diag.message)?;
+            let (pkg_name, _) = extract_dep_data(diag);
+            let pkg_name = pkg_name?;
             Some(make_replace_action(
                 &format!("Add placeholder bounds for '{pkg_name}'"),
                 uri,
@@ -299,6 +281,30 @@ fn action_for_lint(
         }
         _ => None,
     }
+}
+
+/// Extract package name and constraint from diagnostic structured data.
+///
+/// Reads from `diag.data` (a JSON object with "package" and "constraint" keys)
+/// when available. Falls back to parsing the message string.
+fn extract_dep_data(diag: &Diagnostic) -> (Option<String>, Option<String>) {
+    // Try structured data first.
+    if let Some(ref data) = diag.data {
+        let pkg = data.get("package").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let constraint = data.get("constraint").and_then(|v| v.as_str()).map(|s| s.to_string());
+        if pkg.is_some() {
+            return (pkg, constraint);
+        }
+    }
+    // Fall back to message parsing.
+    let pkg = extract_quoted_name(&diag.message);
+    let constraint = diag.message
+        .find('(')
+        .and_then(|start| {
+            let rest = &diag.message[start + 1..];
+            rest.find(')').map(|end| rest[..end].trim().to_string())
+        });
+    (pkg, constraint)
 }
 
 /// Extract a single-quoted name from a diagnostic message (e.g., "Dependency 'pkg' ...").

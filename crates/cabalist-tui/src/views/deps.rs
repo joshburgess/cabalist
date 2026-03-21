@@ -144,7 +144,7 @@ fn check_outdated(
     };
 
     let is_constrained = match version_range {
-        Some(vr) => !version_satisfies_range(&parser_version, vr),
+        Some(vr) => !cabalist_parser::ast::version_satisfies(&parser_version, vr),
         None => false, // "any" accepts everything
     };
 
@@ -152,57 +152,6 @@ fn check_outdated(
         Some(latest.to_string())
     } else {
         None
-    }
-}
-
-/// Check if a version satisfies a version range (best-effort).
-fn version_satisfies_range(
-    version: &cabalist_parser::ast::Version,
-    vr: &VersionRange,
-) -> bool {
-    use std::cmp::Ordering;
-
-    let cmp_versions =
-        |a: &cabalist_parser::ast::Version, b: &cabalist_parser::ast::Version| -> Ordering {
-            let max_len = a.components.len().max(b.components.len());
-            for i in 0..max_len {
-                let ac = a.components.get(i).copied().unwrap_or(0);
-                let bc = b.components.get(i).copied().unwrap_or(0);
-                match ac.cmp(&bc) {
-                    Ordering::Equal => continue,
-                    other => return other,
-                }
-            }
-            Ordering::Equal
-        };
-
-    match vr {
-        VersionRange::Any => true,
-        VersionRange::NoVersion => false,
-        VersionRange::Eq(v) => cmp_versions(version, v) == Ordering::Equal,
-        VersionRange::Gt(v) => cmp_versions(version, v) == Ordering::Greater,
-        VersionRange::Gte(v) => cmp_versions(version, v) != Ordering::Less,
-        VersionRange::Lt(v) => cmp_versions(version, v) == Ordering::Less,
-        VersionRange::Lte(v) => cmp_versions(version, v) != Ordering::Greater,
-        VersionRange::MajorBound(v) => {
-            if cmp_versions(version, v) == Ordering::Less {
-                return false;
-            }
-            let mut upper = v.clone();
-            if upper.components.len() >= 2 {
-                upper.components[1] += 1;
-                upper.components.truncate(2);
-            } else if upper.components.len() == 1 {
-                upper.components[0] += 1;
-            }
-            cmp_versions(version, &upper) == Ordering::Less
-        }
-        VersionRange::And(a, b) => {
-            version_satisfies_range(version, a) && version_satisfies_range(version, b)
-        }
-        VersionRange::Or(a, b) => {
-            version_satisfies_range(version, a) || version_satisfies_range(version, b)
-        }
     }
 }
 
@@ -406,14 +355,6 @@ fn render_tree_mode(
 
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);
-}
-
-/// Public version of `version_satisfies_range` for use by other views.
-pub fn version_satisfies_range_pub(
-    version: &cabalist_parser::ast::Version,
-    vr: &VersionRange,
-) -> bool {
-    version_satisfies_range(version, vr)
 }
 
 /// Count the total items shown in tree mode for navigation bounds.

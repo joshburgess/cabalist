@@ -18,6 +18,7 @@
 pub mod config;
 pub mod defaults;
 pub mod deps;
+pub mod fmt;
 pub mod lints;
 pub mod templates;
 

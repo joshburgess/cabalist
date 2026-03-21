@@ -21,6 +21,10 @@ pub fn parser_diagnostic_to_lsp(
 }
 
 /// Convert an opinion `Lint` to an LSP diagnostic.
+///
+/// Attaches structured data as JSON in the `data` field so that code actions
+/// can extract package names and versions without parsing the human-readable
+/// message string.
 pub fn lint_to_lsp(lint: &Lint, line_index: &LineIndex) -> lsp_types::Diagnostic {
     let mut message = lint.message.clone();
     if let Some(ref suggestion) = lint.suggestion {
@@ -28,14 +32,61 @@ pub fn lint_to_lsp(lint: &Lint, line_index: &LineIndex) -> lsp_types::Diagnostic
         message.push_str(suggestion);
     }
 
+    // Extract structured data from the lint for code actions.
+    let data = extract_lint_data(lint);
+
     lsp_types::Diagnostic {
         range: line_index.span_to_range(lint.span),
         severity: Some(convert_severity(lint.severity)),
         source: Some("cabalist".into()),
         code: Some(NumberOrString::String(lint.id.to_string())),
         message,
+        data,
         ..Default::default()
     }
+}
+
+/// Extract structured metadata from a lint message for use by code actions.
+///
+/// Returns a JSON value with relevant fields (e.g., `{"package": "text"}`)
+/// so code actions don't need to parse the human-readable message.
+fn extract_lint_data(lint: &Lint) -> Option<serde_json::Value> {
+    match lint.id {
+        "missing-upper-bound" | "missing-lower-bound" | "wide-any-version" | "duplicate-dep" => {
+            // These lints are about a specific dependency.
+            // Extract the package name from: "Dependency 'pkg' ..."
+            let pkg = extract_quoted(&lint.message);
+            // Extract version info from: "... (>=X.Y)" or "(^>=X.Y)"
+            let version = lint.message
+                .find('(')
+                .and_then(|start| {
+                    let rest = &lint.message[start + 1..];
+                    rest.find(')').map(|end| rest[..end].trim().to_string())
+                });
+
+            let mut map = serde_json::Map::new();
+            if let Some(p) = pkg {
+                map.insert("package".into(), serde_json::Value::String(p));
+            }
+            if let Some(v) = version {
+                map.insert("constraint".into(), serde_json::Value::String(v));
+            }
+            Some(serde_json::Value::Object(map))
+        }
+        "unused-flag" => {
+            let name = extract_quoted(&lint.message);
+            name.map(|n| serde_json::json!({"flag": n}))
+        }
+        _ => None,
+    }
+}
+
+/// Extract a single-quoted string from a message.
+fn extract_quoted(message: &str) -> Option<String> {
+    let start = message.find('\'')?;
+    let rest = &message[start + 1..];
+    let end = rest.find('\'')?;
+    Some(rest[..end].to_string())
 }
 
 /// Run the full diagnostic pipeline on a document and return LSP diagnostics.

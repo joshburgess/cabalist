@@ -230,9 +230,6 @@ pub struct App {
     pub build_scroll: usize,
     /// Detected GHC version (e.g. "9.8.2"), if available.
     pub ghc_version: Option<String>,
-    /// The `base` library version corresponding to the detected GHC, if known.
-    #[allow(dead_code)]
-    pub base_version: Option<String>,
     /// Parsed GHC diagnostics from the last completed build.
     pub build_diagnostics: Vec<cabalist_cabal::GhcDiagnostic>,
     /// Index of the currently selected diagnostic for navigation.
@@ -280,10 +277,6 @@ impl App {
             .ok();
 
         let ghc_version = cabalist_ghc::versions::detect_ghc_version();
-        let base_version = ghc_version
-            .as_deref()
-            .and_then(cabalist_ghc::versions::base_version_for_ghc)
-            .map(|s| s.to_string());
 
         let hackage_index = load_hackage_index_from_cache();
         let cabal_project = load_cabal_project(project_root);
@@ -316,7 +309,7 @@ impl App {
             undo_stack: Vec::new(),
             build_scroll: 0,
             ghc_version,
-            base_version,
+
             build_diagnostics: Vec::new(),
             selected_diagnostic: 0,
             search_results: Vec::new(),
@@ -349,10 +342,6 @@ impl App {
         let config = cabalist_opinions::config::find_and_load_config(project_root);
 
         let ghc_version = cabalist_ghc::versions::detect_ghc_version();
-        let base_version = ghc_version
-            .as_deref()
-            .and_then(cabalist_ghc::versions::base_version_for_ghc)
-            .map(|s| s.to_string());
 
         let hackage_index = load_hackage_index_from_cache();
         let cabal_project = load_cabal_project(project_root);
@@ -385,7 +374,7 @@ impl App {
             undo_stack: Vec::new(),
             build_scroll: 0,
             ghc_version,
-            base_version,
+
             build_diagnostics: Vec::new(),
             selected_diagnostic: 0,
             search_results: Vec::new(),
@@ -1056,7 +1045,7 @@ impl App {
     /// The result is stored back into `hackage_index` when complete.
     pub fn spawn_hackage_update(&mut self) {
         if self.build_running {
-            self.set_status("A build is running — try again later");
+            self.set_status("Another task is running — wait for it to finish");
             return;
         }
         self.set_status("Updating Hackage index...");
@@ -1113,11 +1102,11 @@ impl App {
 
         // Sort dependencies if configured.
         if config.formatting.sort_dependencies {
-            current = format_sort_list_field(&current, "build-depends");
+            current = cabalist_opinions::fmt::sort_list_field(&current, "build-depends");
         }
         if config.formatting.sort_modules {
-            current = format_sort_list_field(&current, "exposed-modules");
-            current = format_sort_list_field(&current, "other-modules");
+            current = cabalist_opinions::fmt::sort_list_field(&current, "exposed-modules");
+            current = cabalist_opinions::fmt::sort_list_field(&current, "other-modules");
         }
 
         // Round-trip through parser to normalize.
@@ -1323,24 +1312,50 @@ fn create_project_dirs(
 ///
 /// If the field exists, replaces its value. If not, appends it.
 fn set_project_field_in_source(source: &str, field_name: &str, value: &str) -> String {
-    let field_prefix = format!("{}:", field_name);
-    let mut lines: Vec<String> = source.lines().map(|l| l.to_string()).collect();
+    let field_lower = format!("{}:", field_name.to_lowercase());
+    let lines: Vec<&str> = source.lines().collect();
+    let mut result_lines: Vec<String> = Vec::new();
     let mut found = false;
+    let mut skip_continuation = false;
 
-    for line in &mut lines {
-        let trimmed = line.trim_start();
-        if trimmed.to_lowercase().starts_with(&field_prefix.to_lowercase()) {
-            *line = format!("{field_name}: {value}");
-            found = true;
-            break;
+    for line in &lines {
+        if skip_continuation {
+            // Continuation lines are indented (start with whitespace) and non-empty.
+            let is_continuation = !line.is_empty()
+                && line.starts_with(|c: char| c == ' ' || c == '\t')
+                && !line.trim().is_empty();
+            if is_continuation {
+                continue; // Skip this continuation line.
+            }
+            skip_continuation = false;
         }
+
+        let trimmed = line.trim_start();
+        let lower = trimmed.to_lowercase();
+
+        // Match the exact field name followed by a colon (not a prefix of another field).
+        if !found && lower.starts_with(&field_lower) {
+            // Verify it's an exact field match by checking what follows the colon.
+            let after_prefix = &lower[field_lower.len()..];
+            let is_exact = after_prefix.is_empty()
+                || after_prefix.starts_with(' ')
+                || after_prefix.starts_with('\t');
+            if is_exact {
+                result_lines.push(format!("{field_name}: {value}"));
+                found = true;
+                skip_continuation = true; // Skip any continuation lines of the old value.
+                continue;
+            }
+        }
+
+        result_lines.push(line.to_string());
     }
 
     if !found {
-        lines.push(format!("{field_name}: {value}"));
+        result_lines.push(format!("{field_name}: {value}"));
     }
 
-    let mut result = lines.join("\n");
+    let mut result = result_lines.join("\n");
     if !result.ends_with('\n') {
         result.push('\n');
     }
@@ -1392,125 +1407,6 @@ fn count_deps_for_component(ast: &CabalFile<'_>, idx: usize) -> usize {
         ci += 1;
     }
     0
-}
-
-/// Sort items in a list field across all sections (for formatting).
-fn format_sort_list_field(source: &str, field_name: &str) -> String {
-    use cabalist_parser::ast::{derive_ast, Component};
-    use cabalist_parser::edit::{self, EditBatch};
-
-    struct SectionKey {
-        keyword: String,
-        name: Option<String>,
-    }
-
-    let collect_keys = |source: &str| -> Vec<SectionKey> {
-        let result = cabalist_parser::parse(source);
-        let ast = derive_ast(&result.cst);
-        let mut keys = Vec::new();
-        for comp in ast.all_components() {
-            let key = match comp {
-                Component::Library(lib) => SectionKey {
-                    keyword: "library".to_string(),
-                    name: lib.fields.name.map(|s| s.to_string()),
-                },
-                Component::Executable(exe) => SectionKey {
-                    keyword: "executable".to_string(),
-                    name: exe.fields.name.map(|s| s.to_string()),
-                },
-                Component::TestSuite(ts) => SectionKey {
-                    keyword: "test-suite".to_string(),
-                    name: ts.fields.name.map(|s| s.to_string()),
-                },
-                Component::Benchmark(bm) => SectionKey {
-                    keyword: "benchmark".to_string(),
-                    name: bm.fields.name.map(|s| s.to_string()),
-                },
-            };
-            keys.push(key);
-        }
-        for cs in &ast.common_stanzas {
-            keys.push(SectionKey {
-                keyword: "common".to_string(),
-                name: Some(cs.name.to_string()),
-            });
-        }
-        keys
-    };
-
-    let find_sf = |source: &str, key: &SectionKey, fname: &str| -> Option<(cabalist_parser::ParseResult, cabalist_parser::span::NodeId, cabalist_parser::span::NodeId)> {
-        let result = cabalist_parser::parse(source);
-        let section_id = edit::find_section(&result.cst, &key.keyword, key.name.as_deref())?;
-        let field_id = edit::find_field(&result.cst, section_id, fname)?;
-        Some((result, section_id, field_id))
-    };
-
-    let extract_items = |cst: &cabalist_parser::cst::CabalCst, field_node: cabalist_parser::span::NodeId| -> Vec<String> {
-        use cabalist_parser::cst::CstNodeKind;
-        let node = &cst.nodes[field_node.0];
-        let mut items = Vec::new();
-        for &child_id in &node.children {
-            let child = &cst.nodes[child_id.0];
-            if matches!(child.kind, CstNodeKind::ValueLine) {
-                let text = &cst.source[child.span.start..child.span.end];
-                let text = text.trim().trim_start_matches(',').trim_end_matches(',').trim();
-                if !text.is_empty() {
-                    items.push(text.to_string());
-                }
-            }
-        }
-        if items.is_empty() {
-            if let Some(ref val) = node.field_value {
-                let text = &cst.source[val.start..val.end].trim();
-                for part in text.split(',') {
-                    let trimmed = part.trim();
-                    if !trimmed.is_empty() {
-                        items.push(trimmed.to_string());
-                    }
-                }
-            }
-        }
-        items
-    };
-
-    let keys = collect_keys(source);
-    let mut current = source.to_string();
-
-    for key in &keys {
-        let Some((result, _, field_id)) = find_sf(&current, key, field_name) else {
-            continue;
-        };
-        let items = extract_items(&result.cst, field_id);
-        if items.len() <= 1 {
-            continue;
-        }
-        let mut sorted = items.clone();
-        sorted.sort_by(|a, b| a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()));
-        if items == sorted {
-            continue;
-        }
-        for item in items.iter().rev() {
-            let Some((re, _, re_field)) = find_sf(&current, key, field_name) else { break };
-            let item_name = item.split_whitespace().next().unwrap_or(item);
-            let edits = edit::remove_list_item(&re.cst, re_field, item_name);
-            if !edits.is_empty() {
-                let mut batch = EditBatch::new();
-                batch.add_all(edits);
-                current = batch.apply(&re.cst.source);
-            }
-        }
-        for item in &sorted {
-            let Some((re, _, re_field)) = find_sf(&current, key, field_name) else { break };
-            let edits = edit::add_list_item(&re.cst, re_field, item, false);
-            if !edits.is_empty() {
-                let mut batch = EditBatch::new();
-                batch.add_all(edits);
-                current = batch.apply(&re.cst.source);
-            }
-        }
-    }
-
-    current
 }
 
 /// Recursively count .hs files not listed in the module lists.

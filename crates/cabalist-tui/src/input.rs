@@ -187,6 +187,7 @@ fn handle_dashboard_key(key: KeyEvent) -> Action {
         KeyCode::Char('m') => Action::SwitchView(View::Metadata),
         KeyCode::Char('p') => Action::SwitchView(View::Project),
         KeyCode::Char('i') => Action::StartInit,
+        KeyCode::Char('/') => Action::SwitchView(View::Dependencies), // jump to deps for filtering
         _ => Action::None,
     }
 }

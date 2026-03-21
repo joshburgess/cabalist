@@ -139,22 +139,18 @@ fn dashboard_renders_version() {
 }
 
 #[test]
-fn deps_view_shows_dependencies() {
+fn deps_view_shows_all_dependencies() {
     let mut app = make_test_app();
     app.current_view = cabalist_tui::views::View::Dependencies;
     let output = render_to_string(&app, 80, 24);
-    assert!(
-        output.contains("base"),
-        "Deps view should show 'base'.\nOutput:\n{output}"
-    );
-    assert!(
-        output.contains("text"),
-        "Deps view should show 'text'.\nOutput:\n{output}"
-    );
-    assert!(
-        output.contains("aeson"),
-        "Deps view should show 'aeson'.\nOutput:\n{output}"
-    );
+    // Verify all 3 dependencies are shown.
+    assert!(output.contains("base"), "Should show 'base'.\nOutput:\n{output}");
+    assert!(output.contains("text"), "Should show 'text'.\nOutput:\n{output}");
+    assert!(output.contains("aeson"), "Should show 'aeson'.\nOutput:\n{output}");
+    // Verify version constraints are displayed.
+    assert!(output.contains("^>=4.17"), "Should show base constraint.\nOutput:\n{output}");
+    assert!(output.contains("^>=2.0"), "Should show text constraint.\nOutput:\n{output}");
+    assert!(output.contains("^>=2.2"), "Should show aeson constraint.\nOutput:\n{output}");
 }
 
 #[test]
@@ -181,18 +177,19 @@ fn deps_tree_view_renders() {
 }
 
 #[test]
-fn metadata_view_shows_fields() {
+fn metadata_view_shows_all_fields() {
     let mut app = make_test_app();
     app.current_view = cabalist_tui::views::View::Metadata;
     let output = render_to_string(&app, 80, 24);
-    assert!(
-        output.contains("name"),
-        "Metadata view should show field labels.\nOutput:\n{output}"
-    );
-    assert!(
-        output.contains("MIT"),
-        "Metadata view should show license value.\nOutput:\n{output}"
-    );
+    // Verify key field labels are present.
+    assert!(output.contains("name"), "Should show 'name' label.\nOutput:\n{output}");
+    assert!(output.contains("version"), "Should show 'version' label.\nOutput:\n{output}");
+    assert!(output.contains("license"), "Should show 'license' label.\nOutput:\n{output}");
+    // Verify values are displayed.
+    assert!(output.contains("test-pkg"), "Should show package name value.\nOutput:\n{output}");
+    assert!(output.contains("MIT"), "Should show license value.\nOutput:\n{output}");
+    assert!(output.contains("0.1.0.0"), "Should show version value.\nOutput:\n{output}");
+    assert!(output.contains("A test package"), "Should show synopsis.\nOutput:\n{output}");
 }
 
 #[test]
@@ -247,4 +244,41 @@ fn header_shows_package_in_header() {
         output.contains("test-pkg"),
         "Header should show the package name.\nOutput:\n{output}"
     );
+}
+
+#[test]
+fn dashboard_shows_component_counts() {
+    let app = make_test_app();
+    let output = render_to_string(&app, 80, 24);
+    // Should show library with 3 deps and exe/test with 2 deps each.
+    assert!(output.contains("3 deps"), "Should show library dep count.\nOutput:\n{output}");
+    assert!(output.contains("test-exe"), "Should show executable name.\nOutput:\n{output}");
+    assert!(output.contains("test-tests"), "Should show test-suite name.\nOutput:\n{output}");
+}
+
+#[test]
+fn dashboard_shows_health_summary() {
+    let app = make_test_app();
+    let output = render_to_string(&app, 80, 24);
+    // Should show some lint summary (errors, warnings, suggestions).
+    assert!(
+        output.contains("errors") || output.contains("warnings") || output.contains("suggestions"),
+        "Should show health summary.\nOutput:\n{output}"
+    );
+}
+
+#[test]
+fn deps_view_shows_correct_dep_count() {
+    let mut app = make_test_app();
+    app.current_view = cabalist_tui::views::View::Dependencies;
+    // Library has 3 deps (base, text, aeson).
+    assert_eq!(app.current_list_len(), 3);
+}
+
+#[test]
+fn small_terminal_does_not_crash() {
+    let app = make_test_app();
+    // Render at very small size — should not panic.
+    let output = render_to_string(&app, 20, 5);
+    assert!(!output.is_empty());
 }

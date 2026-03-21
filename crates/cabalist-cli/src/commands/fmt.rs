@@ -8,8 +8,6 @@ use std::process::ExitCode;
 
 use anyhow::Result;
 use cabalist_opinions::config::find_and_load_config;
-use cabalist_parser::ast::{derive_ast, Component};
-use cabalist_parser::edit::{self, EditBatch};
 
 use crate::util;
 
@@ -27,13 +25,13 @@ pub fn run(file: &Option<PathBuf>, check: bool) -> Result<ExitCode> {
 
     // Sort dependencies if configured.
     if config.formatting.sort_dependencies {
-        current_source = sort_list_field(&current_source, "build-depends");
+        current_source = cabalist_opinions::fmt::sort_list_field(&current_source,"build-depends");
     }
 
     // Sort modules if configured.
     if config.formatting.sort_modules {
-        current_source = sort_list_field(&current_source, "exposed-modules");
-        current_source = sort_list_field(&current_source, "other-modules");
+        current_source = cabalist_opinions::fmt::sort_list_field(&current_source,"exposed-modules");
+        current_source = cabalist_opinions::fmt::sort_list_field(&current_source,"other-modules");
     }
 
     // Re-parse and render to normalize (the round-trip should be clean).
@@ -59,173 +57,10 @@ pub fn run(file: &Option<PathBuf>, check: bool) -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-/// A section identifier that survives re-parsing: keyword + optional name.
-#[derive(Debug, Clone)]
-struct SectionKey {
-    keyword: String,
-    name: Option<String>,
-}
-
-/// Collect stable section identifiers from the AST.
-fn collect_section_keys(source: &str) -> Vec<SectionKey> {
-    let result = cabalist_parser::parse(source);
-    let ast = derive_ast(&result.cst);
-    let mut keys = Vec::new();
-
-    for comp in ast.all_components() {
-        let key = match comp {
-            Component::Library(lib) => SectionKey {
-                keyword: "library".to_string(),
-                name: lib.fields.name.map(|s| s.to_string()),
-            },
-            Component::Executable(exe) => SectionKey {
-                keyword: "executable".to_string(),
-                name: exe.fields.name.map(|s| s.to_string()),
-            },
-            Component::TestSuite(ts) => SectionKey {
-                keyword: "test-suite".to_string(),
-                name: ts.fields.name.map(|s| s.to_string()),
-            },
-            Component::Benchmark(bm) => SectionKey {
-                keyword: "benchmark".to_string(),
-                name: bm.fields.name.map(|s| s.to_string()),
-            },
-        };
-        keys.push(key);
-    }
-    for cs in &ast.common_stanzas {
-        keys.push(SectionKey {
-            keyword: "common".to_string(),
-            name: Some(cs.name.to_string()),
-        });
-    }
-    keys
-}
-
-/// Re-find a section and field in a freshly parsed source.
-fn find_section_field(
-    source: &str,
-    key: &SectionKey,
-    field_name: &str,
-) -> Option<(cabalist_parser::ParseResult, cabalist_parser::span::NodeId, cabalist_parser::span::NodeId)> {
-    let result = cabalist_parser::parse(source);
-    let section_id = edit::find_section(&result.cst, &key.keyword, key.name.as_deref())?;
-    let field_id = edit::find_field(&result.cst, section_id, field_name)?;
-    Some((result, section_id, field_id))
-}
-
-/// Sort items within all instances of a specific list field across all sections.
-///
-/// For each section containing the target field, reads items, sorts them, and
-/// rewrites by removing items one-at-a-time (re-parsing between each removal)
-/// then re-adding in sorted order (also one-at-a-time).
-fn sort_list_field(source: &str, field_name: &str) -> String {
-    let section_keys = collect_section_keys(source);
-    let mut current = source.to_string();
-
-    for key in &section_keys {
-        // Parse and find the field.
-        let Some((result, _section_id, field_id)) =
-            find_section_field(&current, key, field_name)
-        else {
-            continue;
-        };
-
-        // Extract current items.
-        let items = extract_list_items(&result.cst, field_id);
-        if items.len() <= 1 {
-            continue;
-        }
-
-        // Check if already sorted.
-        let mut sorted_items = items.clone();
-        sorted_items.sort_by(|a, b| a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()));
-        if items == sorted_items {
-            continue;
-        }
-
-        // Remove items one at a time, re-parsing between each removal.
-        // Remove in reverse order so we don't need to worry about name collisions
-        // with items that share prefixes.
-        for item in items.iter().rev() {
-            let Some((re_result, _re_section, re_field)) =
-                find_section_field(&current, key, field_name)
-            else {
-                break;
-            };
-            let item_name = item.split_whitespace().next().unwrap_or(item);
-            let edits = edit::remove_list_item(&re_result.cst, re_field, item_name);
-            if !edits.is_empty() {
-                let mut batch = EditBatch::new();
-                batch.add_all(edits);
-                current = batch.apply(&re_result.cst.source);
-            }
-        }
-
-        // Re-add items in sorted order, one at a time.
-        for item in &sorted_items {
-            let Some((re_result, _re_section, re_field)) =
-                find_section_field(&current, key, field_name)
-            else {
-                break;
-            };
-            let edits = edit::add_list_item(&re_result.cst, re_field, item, false);
-            if !edits.is_empty() {
-                let mut batch = EditBatch::new();
-                batch.add_all(edits);
-                current = batch.apply(&re_result.cst.source);
-            }
-        }
-    }
-
-    current
-}
-
-/// Extract the individual items from a list field's value.
-fn extract_list_items(
-    cst: &cabalist_parser::cst::CabalCst,
-    field_node: cabalist_parser::span::NodeId,
-) -> Vec<String> {
-    use cabalist_parser::cst::CstNodeKind;
-
-    let node = &cst.nodes[field_node.0];
-    let mut items = Vec::new();
-
-    // Collect value lines from children.
-    for &child_id in &node.children {
-        let child = &cst.nodes[child_id.0];
-        if matches!(child.kind, CstNodeKind::ValueLine) {
-            let text = &cst.source[child.span.start..child.span.end];
-            let text = text.trim();
-            // Strip leading/trailing commas.
-            let text = text.trim_start_matches(',').trim_end_matches(',').trim();
-            if !text.is_empty() {
-                items.push(text.to_string());
-            }
-        }
-    }
-
-    // If no ValueLine children, try the field_value directly.
-    if items.is_empty() {
-        if let Some(ref val) = node.field_value {
-            let text = &cst.source[val.start..val.end];
-            let text = text.trim();
-            // Split comma-separated single-line values.
-            for part in text.split(',') {
-                let trimmed = part.trim();
-                if !trimmed.is_empty() {
-                    items.push(trimmed.to_string());
-                }
-            }
-        }
-    }
-
-    items
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use cabalist_opinions::fmt::sort_list_field;
+    use cabalist_parser::ast::derive_ast;
 
     #[test]
     fn sort_trailing_comma_deps() {

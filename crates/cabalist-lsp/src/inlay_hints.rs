@@ -44,7 +44,7 @@ pub fn inlay_hints(
                 let parser_version = cabalist_parser::ast::Version {
                     components: latest.components.clone(),
                 };
-                !version_satisfies_range(&parser_version, vr)
+                !cabalist_parser::ast::version_satisfies(&parser_version, vr)
             }
             None => false,
         };
@@ -79,57 +79,6 @@ pub fn inlay_hints(
     }
 
     hints
-}
-
-/// Check if a version satisfies a version range.
-fn version_satisfies_range(
-    version: &cabalist_parser::ast::Version,
-    vr: &cabalist_parser::ast::VersionRange,
-) -> bool {
-    use cabalist_parser::ast::VersionRange;
-    use std::cmp::Ordering;
-
-    let cmp = |a: &cabalist_parser::ast::Version, b: &cabalist_parser::ast::Version| -> Ordering {
-        let max_len = a.components.len().max(b.components.len());
-        for i in 0..max_len {
-            let ac = a.components.get(i).copied().unwrap_or(0);
-            let bc = b.components.get(i).copied().unwrap_or(0);
-            match ac.cmp(&bc) {
-                Ordering::Equal => continue,
-                other => return other,
-            }
-        }
-        Ordering::Equal
-    };
-
-    match vr {
-        VersionRange::Any => true,
-        VersionRange::NoVersion => false,
-        VersionRange::Eq(v) => cmp(version, v) == Ordering::Equal,
-        VersionRange::Gt(v) => cmp(version, v) == Ordering::Greater,
-        VersionRange::Gte(v) => cmp(version, v) != Ordering::Less,
-        VersionRange::Lt(v) => cmp(version, v) == Ordering::Less,
-        VersionRange::Lte(v) => cmp(version, v) != Ordering::Greater,
-        VersionRange::MajorBound(v) => {
-            if cmp(version, v) == Ordering::Less {
-                return false;
-            }
-            let mut upper = v.clone();
-            if upper.components.len() >= 2 {
-                upper.components[1] += 1;
-                upper.components.truncate(2);
-            } else if upper.components.len() == 1 {
-                upper.components[0] += 1;
-            }
-            cmp(version, &upper) == Ordering::Less
-        }
-        VersionRange::And(a, b) => {
-            version_satisfies_range(version, a) && version_satisfies_range(version, b)
-        }
-        VersionRange::Or(a, b) => {
-            version_satisfies_range(version, a) || version_satisfies_range(version, b)
-        }
-    }
 }
 
 #[cfg(test)]
