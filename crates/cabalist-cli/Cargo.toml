@@ -22,6 +22,7 @@ cabalist-opinions = { path = "../cabalist-opinions" }
 cabalist-cabal = { path = "../cabalist-cabal" }
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
+notify = { version = "7", default-features = false, features = ["macos_kqueue"] }
 anyhow = "1"
 colored = "2"
 directories = "5"

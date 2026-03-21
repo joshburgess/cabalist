@@ -94,6 +94,63 @@ pub fn run(file: &Option<PathBuf>, strict: bool, format: OutputFormat) -> Result
     Ok(ExitCode::SUCCESS)
 }
 
+/// Run lints in watch mode — re-runs on every file change.
+pub fn run_watch(
+    file: &Option<PathBuf>,
+    strict: bool,
+    format: OutputFormat,
+) -> Result<ExitCode> {
+    use colored::Colorize;
+    use notify::{RecursiveMode, Watcher};
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    let cabal_path = util::resolve_cabal_file(file)?;
+    eprintln!(
+        "{} {} for changes (Ctrl+C to stop)",
+        "Watching".green().bold(),
+        cabal_path.display()
+    );
+
+    // Run once immediately.
+    let _ = run(&Some(cabal_path.clone()), strict, format);
+
+    // Set up file watcher.
+    let (tx, rx) = mpsc::channel();
+    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        if let Ok(event) = res {
+            if event.kind.is_modify() {
+                let _ = tx.send(());
+            }
+        }
+    })?;
+
+    watcher.watch(&cabal_path, RecursiveMode::NonRecursive)?;
+
+    // Debounce: wait for changes, batch rapid saves.
+    loop {
+        // Block until a change event arrives.
+        rx.recv()?;
+
+        // Drain any additional events that arrived in quick succession.
+        std::thread::sleep(Duration::from_millis(100));
+        while rx.try_recv().is_ok() {}
+
+        // Clear screen and re-run.
+        eprint!("\x1B[2J\x1B[H"); // ANSI clear screen + cursor home
+        eprintln!(
+            "{} {} changed, re-checking...\n",
+            "File".cyan().bold(),
+            cabal_path.display()
+        );
+        let _ = run(&Some(cabal_path.clone()), strict, format);
+        eprintln!(
+            "\n{} for changes...",
+            "Watching".green().bold()
+        );
+    }
+}
+
 fn print_json_output(
     file: &std::path::Path,
     source: &str,

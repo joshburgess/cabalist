@@ -74,6 +74,9 @@ enum Command {
         /// Treat warnings as errors
         #[arg(long)]
         strict: bool,
+        /// Watch for changes and re-run automatically
+        #[arg(long)]
+        watch: bool,
     },
     /// Format the .cabal file
     Fmt {
@@ -160,7 +163,13 @@ fn main() -> ExitCode {
         Command::Remove { package, component } => {
             commands::remove::run(&cli.file, &package, &component)
         }
-        Command::Check { strict } => commands::check::run(&cli.file, strict, cli.format),
+        Command::Check { strict, watch } => {
+            if watch {
+                commands::check::run_watch(&cli.file, strict, cli.format)
+            } else {
+                commands::check::run(&cli.file, strict, cli.format)
+            }
+        }
         Command::Fmt { check } => commands::fmt::run(&cli.file, check),
         Command::Deps { tree, outdated } => commands::deps::run(&cli.file, tree, outdated),
         Command::Modules { scan, component } => commands::modules::run(&cli.file, scan, &component),
