@@ -134,6 +134,24 @@ Cabalist is a Rust workspace of 9 focused crates:
 3. **Shell out to `cabal` for what it does well** — solving, building, testing.
 4. **Be strongly opinionated with transparent escape hatches** — every lint and default is individually configurable.
 
+### Why Rust?
+
+Cabalist is a tool for Haskell developers, written in Rust. This is a deliberate choice, not an accident.
+
+**Zero-dependency installation.** Cabalist's goal is to make `.cabal` management as easy as Stack. Stack's magic is that it's a single binary you download and run. Cabalist achieves the same: `brew install cabalist` and you're done. A Haskell implementation would require a working GHC toolchain to build — creating a chicken-and-egg problem for the exact users (newcomers setting up their first project) that cabalist is designed to help.
+
+**Trivial cross-platform static binaries.** Rust produces fully static, self-contained binaries for every major platform with a single `cargo build --target`. Our CI builds for Linux x64, macOS x64, macOS ARM, and Windows in a simple matrix. GHC can produce static binaries, but it requires musl libc on Linux, doesn't support fully static linking on macOS (Apple's linker requires dynamic system frameworks), and makes cross-compilation painful. For a tool whose purpose is lowering the barrier to entry, distribution friction matters.
+
+**The parser needed to not be the Cabal library.** This sounds paradoxical, but: if you write a `.cabal` parser in Haskell, you'd naturally reach for `Cabal-syntax` — a 100k+ line library designed for evaluation and dependency solving, not round-trip editing. Cabalist's CST parser preserves every byte of the original source (comments, whitespace, field ordering) with byte-identical fidelity. This is a fundamentally different design than what `Cabal-syntax` provides, and building it from scratch in Rust made it natural to get the abstraction right without fighting an existing library's assumptions.
+
+**TUI and LSP ecosystem maturity.** ratatui + crossterm is the most actively maintained TUI framework in any language, with excellent Windows terminal support. tower-lsp provides an async LSP server that starts in milliseconds — important for a tool that activates on every `.cabal` file open. Haskell's `brick` is excellent for TUIs but less actively developed, and Haskell LSP servers are known for slow startup due to GHC runtime initialization.
+
+**Rust's type system fits the problem.** Ownership semantics naturally prevent use-after-free bugs in the CST arena (flat `Vec<Node>` with `NodeId` indices). No GC pressure on large parse trees. The async runtime (tokio) handles concurrent build subprocess streaming cleanly. These aren't things Haskell can't do — they're things Rust makes easy to get right by default.
+
+**What Haskell would have been better at.** If cabalist needed to fully evaluate conditionals, resolve flags, or compute dependency solutions, the `Cabal` library would be the right tool. But cabalist intentionally doesn't do that — it shells out to `cabal` for solving and building, and works at the syntactic level where a purpose-built CST parser is the right abstraction.
+
+The short version: cabalist is a developer tool, and the best developer tools minimize friction for their users. Rust minimizes friction at every point — installation, distribution, startup time, cross-platform support — in ways that directly serve cabalist's mission of making Haskell development more approachable.
+
 ## Contributing
 
 ```sh
