@@ -82,6 +82,28 @@ pub enum Action {
     MetadataConfirm,
     /// Cancel the metadata edit.
     MetadataCancel,
+    /// Toggle between flat list and tree view for dependencies.
+    ToggleDepsTreeMode,
+    /// Trigger async Hackage index update.
+    UpdateHackageIndex,
+    /// Format the .cabal file (round-trip + optional sort).
+    FormatFile,
+    /// Toggle inline filter mode for deps view.
+    ToggleDepsFilter,
+    /// Type a character into the deps filter.
+    DepsFilterInput(char),
+    /// Delete a character from the deps filter.
+    DepsFilterBackspace,
+    /// Start editing a project field.
+    ProjectStartEdit,
+    /// Type a character into the project edit buffer.
+    ProjectInput(char),
+    /// Delete a character from the project edit buffer.
+    ProjectBackspace,
+    /// Confirm the project field edit.
+    ProjectConfirm,
+    /// Cancel the project field edit.
+    ProjectCancel,
 }
 
 /// Map a key event to an action based on current app state.
@@ -96,6 +118,16 @@ pub fn handle_key(app: &App, key: KeyEvent) -> Action {
         return handle_metadata_edit_key(key);
     }
 
+    // If project field edit is active, route to project edit handler.
+    if app.editing_project_field {
+        return handle_project_edit_key(key);
+    }
+
+    // If deps filter is active, route keys to filter input.
+    if app.deps_filter_active {
+        return handle_deps_filter_key(key);
+    }
+
     // If search is active, route most keys to search input.
     if app.search_active {
         return handle_search_key(key);
@@ -107,6 +139,8 @@ pub fn handle_key(app: &App, key: KeyEvent) -> Action {
         (KeyModifiers::CONTROL, KeyCode::Char('s')) => return Action::Save,
         (KeyModifiers::CONTROL, KeyCode::Char('r')) => return Action::Reload,
         (KeyModifiers::CONTROL, KeyCode::Char('z')) => return Action::Undo,
+        (KeyModifiers::CONTROL, KeyCode::Char('u')) => return Action::UpdateHackageIndex,
+        (KeyModifiers::CONTROL, KeyCode::Char('f')) => return Action::FormatFile,
         _ => {}
     }
 
@@ -122,8 +156,8 @@ pub fn handle_key(app: &App, key: KeyEvent) -> Action {
         KeyCode::Enter => Action::Select,
         KeyCode::Tab => Action::NextComponent,
         KeyCode::BackTab => Action::PrevComponent,
-        KeyCode::Char('/') => Action::ToggleSearch,
         // View-specific actions depend on the current view.
+        // Note: '/' is handled per-view (deps uses filter, others use search).
         _ => handle_view_key(app, key),
     }
 }
@@ -136,6 +170,7 @@ fn handle_view_key(app: &App, key: KeyEvent) -> Action {
         View::Extensions => handle_extensions_key(key),
         View::Build => handle_build_key(key),
         View::Metadata => handle_metadata_key(key),
+        View::Project => handle_project_key(key),
         View::Help => {
             // Any key closes the help overlay.
             Action::Back
@@ -150,6 +185,7 @@ fn handle_dashboard_key(key: KeyEvent) -> Action {
         KeyCode::Char('e') => Action::SwitchView(View::Extensions),
         KeyCode::Char('b') => Action::SwitchView(View::Build),
         KeyCode::Char('m') => Action::SwitchView(View::Metadata),
+        KeyCode::Char('p') => Action::SwitchView(View::Project),
         KeyCode::Char('i') => Action::StartInit,
         _ => Action::None,
     }
@@ -159,6 +195,22 @@ fn handle_deps_key(key: KeyEvent) -> Action {
     match key.code {
         KeyCode::Char('a') => Action::AddItem,
         KeyCode::Char('r') => Action::RemoveItem,
+        KeyCode::Char('v') => Action::ToggleDepsTreeMode,
+        KeyCode::Char('/') => Action::ToggleDepsFilter,
+        _ => Action::None,
+    }
+}
+
+fn handle_deps_filter_key(key: KeyEvent) -> Action {
+    if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('c') {
+        return Action::Quit;
+    }
+    match key.code {
+        KeyCode::Esc => Action::ToggleDepsFilter,
+        KeyCode::Backspace => Action::DepsFilterBackspace,
+        KeyCode::Up => Action::MoveUp,
+        KeyCode::Down => Action::MoveDown,
+        KeyCode::Char(c) => Action::DepsFilterInput(c),
         _ => Action::None,
     }
 }
@@ -167,6 +219,7 @@ fn handle_extensions_key(key: KeyEvent) -> Action {
     match key.code {
         KeyCode::Char(' ') => Action::ToggleItem,
         KeyCode::Char('i') => Action::ShowInfo,
+        KeyCode::Char('/') => Action::ToggleSearch,
         _ => Action::None,
     }
 }
@@ -202,6 +255,26 @@ fn handle_metadata_edit_key(key: KeyEvent) -> Action {
         KeyCode::Enter => Action::MetadataConfirm,
         KeyCode::Backspace => Action::MetadataBackspace,
         KeyCode::Char(c) => Action::MetadataInput(c),
+        _ => Action::None,
+    }
+}
+
+fn handle_project_key(key: KeyEvent) -> Action {
+    match key.code {
+        KeyCode::Enter => Action::ProjectStartEdit,
+        _ => Action::None,
+    }
+}
+
+fn handle_project_edit_key(key: KeyEvent) -> Action {
+    if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('c') {
+        return Action::Quit;
+    }
+    match key.code {
+        KeyCode::Esc => Action::ProjectCancel,
+        KeyCode::Enter => Action::ProjectConfirm,
+        KeyCode::Backspace => Action::ProjectBackspace,
+        KeyCode::Char(c) => Action::ProjectInput(c),
         _ => Action::None,
     }
 }

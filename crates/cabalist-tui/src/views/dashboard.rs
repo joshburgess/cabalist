@@ -214,9 +214,20 @@ fn render_health(frame: &mut Frame, app: &App, area: Rect) {
         .filter(|l| l.severity == Severity::Info)
         .count();
 
+    // Count outdated dependencies.
+    let n_outdated = count_outdated_deps(app);
+
     let mut lines: Vec<Line<'_>> = Vec::new();
 
-    let summary = format!("  {n_errors} errors, {n_warnings} warnings, {n_info} suggestions");
+    let n_unlisted = app.count_unlisted_modules();
+
+    let mut summary = format!("  {n_errors} errors, {n_warnings} warnings, {n_info} suggestions");
+    if n_outdated > 0 {
+        summary.push_str(&format!(", {n_outdated} outdated deps"));
+    }
+    if n_unlisted > 0 {
+        summary.push_str(&format!(", {n_unlisted} unlisted modules"));
+    }
     let summary_style = if n_errors > 0 {
         theme.error_style()
     } else if n_warnings > 0 {
@@ -260,6 +271,34 @@ fn render_health(frame: &mut Frame, app: &App, area: Rect) {
 
     let paragraph = Paragraph::new(lines);
     frame.render_widget(paragraph, inner);
+}
+
+/// Count the number of outdated dependencies using the Hackage index.
+fn count_outdated_deps(app: &App) -> usize {
+    let Some(ref index) = app.hackage_index else {
+        return 0;
+    };
+
+    let ast = app.ast();
+    let mut count = 0;
+
+    for dep in ast.all_dependencies() {
+        let Some(latest) = index.latest_version(dep.package) else {
+            continue;
+        };
+        let parser_version = cabalist_parser::ast::Version {
+            components: latest.components.clone(),
+        };
+        let is_outdated = match &dep.version_range {
+            Some(vr) => !crate::views::deps::version_satisfies_range_pub(&parser_version, vr),
+            None => false,
+        };
+        if is_outdated {
+            count += 1;
+        }
+    }
+
+    count
 }
 
 /// Extension trait to get a border style from the theme.

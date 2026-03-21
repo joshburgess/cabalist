@@ -7,6 +7,7 @@ pub mod extensions;
 pub mod help;
 pub mod init;
 pub mod metadata;
+pub mod project;
 
 /// The active view in the TUI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +22,8 @@ pub enum View {
     Build,
     /// Metadata field editor.
     Metadata,
+    /// cabal.project file viewer/editor.
+    Project,
     /// Help overlay (renders on top of the current view).
     Help,
     /// Init wizard for creating a new project.

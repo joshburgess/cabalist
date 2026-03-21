@@ -1,8 +1,12 @@
 pub mod add;
+pub mod build;
 pub mod check;
 pub mod deps;
+pub mod extensions;
 pub mod fmt;
 pub mod info;
 pub mod init;
 pub mod modules;
 pub mod remove;
+pub mod set;
+pub mod update_index;

@@ -28,12 +28,13 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     let keybindings = match app.current_view {
-        View::Dashboard => " [d]eps  [e]xt  [b]uild  [m]eta  [i]nit  [?]help  [q]uit",
-        View::Dependencies => " [a]dd  [r]emove  [/]search  [Tab]component  [Esc]back  [?]help",
+        View::Dashboard => " [d]eps  [e]xt  [b]uild  [m]eta  [p]roject  [i]nit  [?]help  [q]uit",
+        View::Dependencies => " [a]dd  [r]emove  [v]iew  [/]search  [Tab]component  [Esc]back  [?]help",
         View::Extensions => " [Space]toggle  [/]search  [i]nfo  [Tab]component  [Esc]back  [?]help",
         View::Build => " [b]uild  [t]est  [c]lean  [Esc]back  [?]help",
         View::Metadata => " [j/k]navigate  [Esc]back  [?]help",
         View::Help => " Press any key to close",
+        View::Project => " [j/k]navigate  [Enter]edit  [Esc]back  [?]help",
         View::Init => " [Enter]next  [Esc]back  [Tab]cycle option  [Ctrl+C]quit",
     };
 

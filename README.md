@@ -3,20 +3,42 @@
 [![CI](https://github.com/joshburgess/cabalist/actions/workflows/ci.yml/badge.svg)](https://github.com/joshburgess/cabalist/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 
-A strongly opinionated TUI tool for managing Haskell `.cabal` files, built in Rust with ratatui.
+**Cabalist** is a strongly opinionated toolkit for managing Haskell `.cabal` files. It provides an interactive TUI, a scriptable CLI, and an LSP server for editor integration — all backed by a parser with byte-identical round-trip fidelity.
 
-## Goal
+The guiding principle: **make pure-Cabal Haskell development as approachable as Stack**, by eliminating the friction of `.cabal` file management while keeping the `.cabal` file as the source of truth.
 
-Make pure-Cabal Haskell development as approachable as Stack, by providing a beautiful TUI that guides users through every pain point of `.cabal` file management.
+## What Cabalist Does
+
+- **Manages dependencies** — search Hackage, add packages with correct PVP bounds, detect outdated versions, visualize the dependency tree
+- **Manages GHC extensions** — browse 200+ extensions with descriptions and safety notes, toggle them on/off
+- **Lints your .cabal file** — 16 opinionated, individually configurable checks that catch missing bounds, bad practices, and structural issues
+- **Formats your .cabal file** — round-trip safe formatting with optional alphabetical sorting
+- **Builds your project** — run `cabal build`, `cabal test`, and `cabal clean` with streaming output and error navigation
+- **Initializes new projects** — guided wizard with templates (library, application, library+exe, full)
+- **Edits metadata** — change name, version, license, synopsis, and all other top-level fields
+- **Manages cabal.project** — view and edit project-level configuration (compiler, index-state, constraints)
+- **Integrates with editors** — full LSP server with diagnostics, completions, hover, code actions, formatting, semantic tokens, inlay hints, goto definition, and rename
+
+All of this while **preserving your comments, formatting, and field ordering**. Cabalist never rewrites what you didn't ask it to change.
+
+## Three Tools, One Codebase
+
+| Tool | Use Case |
+|------|----------|
+| **`cabalist`** | Interactive TUI for day-to-day development |
+| **`cabalist-cli`** | Scriptable CLI for automation, CI, and quick edits from the terminal |
+| **`cabalist-lsp`** | LSP server for VS Code, Neovim, Emacs, and any LSP-compatible editor |
 
 ## Installation
 
-### Pre-built binaries (recommended)
+### Pre-built Binaries
 
-Download the latest release for your platform from the [Releases page](https://github.com/joshburgess/cabalist/releases), or use the install script:
+Download from the [Releases page](https://github.com/joshburgess/cabalist/releases).
+
+### Homebrew (macOS / Linux)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/joshburgess/cabalist/main/install.sh | bash
+brew install joshburgess/tap/cabalist
 ```
 
 ### Nix
@@ -25,95 +47,99 @@ curl -fsSL https://raw.githubusercontent.com/joshburgess/cabalist/main/install.s
 nix run github:joshburgess/cabalist
 ```
 
-Or add to your flake inputs:
+### From Source
 
-```nix
-{
-  inputs.cabalist.url = "github:joshburgess/cabalist";
-}
-```
-
-### Homebrew
+Requires Rust 1.75+:
 
 ```sh
-brew install joshburgess/tap/cabalist
-```
-
-### Docker (CLI only)
-
-```sh
-docker run --rm -v "$PWD:/work" -w /work ghcr.io/joshburgess/cabalist-cli check
-```
-
-### From source
-
-Requires Rust 1.75 or later:
-
-```sh
-git clone https://github.com/joshburgess/cabalist.git
-cd cabalist
-cargo install --path crates/cabalist-tui
-cargo install --path crates/cabalist-cli
+cargo install --path crates/cabalist-tui   # Interactive TUI
+cargo install --path crates/cabalist-cli   # CLI tool
+cargo install --path crates/cabalist-lsp   # LSP server
 ```
 
 ## Quick Start
 
-```sh
-# Launch the interactive TUI in your Haskell project directory
-cabalist
+### TUI
 
-# Or use the CLI for scripting and CI
-cabalist-cli check          # Run opinionated lints
-cabalist-cli add aeson      # Add a dependency with PVP bounds
-cabalist-cli info           # Show project summary
+```sh
+cd my-haskell-project
+cabalist                  # Launch the interactive TUI
 ```
 
-## Features
+Use `d` for dependencies, `e` for extensions, `b` for build, `m` for metadata, `p` for cabal.project. Press `?` for help anywhere.
 
-- **Interactive dependency management** -- search Hackage, add/remove dependencies with proper PVP bounds
-- **Extension browser** -- toggle GHC extensions with descriptions and safety notes
-- **Opinionated lints** -- catch missing bounds, bad practices, and suggest improvements
-- **Build integration** -- run `cabal build` and `cabal test` with streaming output
-- **Round-trip fidelity** -- your comments, formatting, and field ordering are preserved
-- **Project initialization** -- guided wizard to create well-structured `.cabal` files
+### CLI
+
+```sh
+cabalist-cli check                         # Lint your .cabal file
+cabalist-cli add aeson                     # Add a dependency with PVP bounds
+cabalist-cli add text --version "^>=2.0"   # Add with specific version constraint
+cabalist-cli remove old-package            # Remove a dependency
+cabalist-cli extensions --toggle DerivingStrategies  # Toggle an extension
+cabalist-cli set synopsis "My cool library"          # Set a metadata field
+cabalist-cli fmt                           # Format the .cabal file
+cabalist-cli deps --outdated               # Check for outdated dependencies
+cabalist-cli deps --tree                   # Show dependency tree
+cabalist-cli modules --scan                # Find .hs files not listed in .cabal
+cabalist-cli build                         # Run cabal build
+cabalist-cli test                          # Run cabal test
+cabalist-cli info                          # Show project summary
+cabalist-cli init --type full              # Create a new project
+cabalist-cli update-index                  # Download/refresh Hackage index
+```
+
+### Editor (LSP)
+
+Install `cabalist-lsp` and configure your editor:
+
+- **VS Code**: See `editors/vscode/` for the extension
+- **Neovim**: See `editors/neovim/init.lua`
+- **Emacs**: See `editors/emacs/cabalist-lsp.el`
+
+The LSP provides: diagnostics (16 lints), completions (packages, extensions, fields), hover documentation, code actions (quick fixes), document symbols (outline), formatting, semantic tokens, inlay hints (latest versions), goto definition (`import:` to `common` stanza), and rename (common stanza refactoring).
+
+## Documentation
+
+| Guide | What It Covers |
+|-------|---------------|
+| [Getting Started](docs/getting-started.md) | End-to-end walkthroughs for common scenarios |
+| [TUI Guide](docs/tui-guide.md) | Every view, keybinding, and workflow in the interactive TUI |
+| [CLI Reference](docs/cli-reference.md) | Every command, flag, and example for the CLI |
+| [Editor Setup](docs/editor-setup.md) | VS Code, Neovim, and Emacs configuration |
+| [Opinions & Lints](docs/opinions.md) | All 16 lints with rationale and configuration |
+| [Configuration](docs/configuration.md) | `cabalist.toml` reference with all options |
+| [Keybindings](docs/keybindings.md) | Complete TUI keyboard reference |
+| [Cabal Spec Compliance](docs/cabal-spec-compliance.md) | Parser syntax support and test coverage |
 
 ## Architecture
 
-Cabalist ships two binaries backed by shared library crates:
-
-- **`cabalist`** -- the interactive TUI application
-- **`cabalist-cli`** -- the scriptable, non-interactive CLI for automation and CI
-
-### Crate structure
+Cabalist is a Rust workspace of 9 focused crates:
 
 | Crate | Purpose |
 |-------|---------|
-| `cabalist-parser` | CST/AST parser for `.cabal` files with round-trip fidelity |
+| `cabalist-parser` | CST/AST parser with byte-identical round-trip fidelity |
 | `cabalist-project` | Parser for `cabal.project` files |
-| `cabalist-ghc` | GHC extensions, warnings, and version knowledge base |
-| `cabalist-hackage` | Hackage package index, search, and version bounds |
-| `cabalist-opinions` | Opinionated lints, defaults, templates, and configuration |
-| `cabalist-cabal` | Interface to the `cabal` CLI subprocess |
-| `cabalist-tui` | The TUI application (ratatui) |
-| `cabalist-cli` | The non-interactive CLI tool |
+| `cabalist-ghc` | GHC extensions (200+), warnings, and version knowledge base |
+| `cabalist-hackage` | Hackage index, package search, PVP version bounds |
+| `cabalist-opinions` | 16 lints, defaults, templates, and configuration |
+| `cabalist-cabal` | Async subprocess interface to `cabal` CLI |
+| `cabalist-tui` | Interactive TUI (ratatui + crossterm) |
+| `cabalist-cli` | Non-interactive CLI (clap) |
+| `cabalist-lsp` | LSP server (tower-lsp) |
 
-### Design principles
+### Design Principles
 
-1. The `.cabal` file is the source of truth, always.
-2. Preserve what the user wrote (comments, formatting, ordering).
-3. Shell out to `cabal` for what it does well (solving, building).
-4. Be strongly opinionated with transparent escape hatches.
+1. **The `.cabal` file is the source of truth** — always.
+2. **Preserve what the user wrote** — comments, formatting, and field ordering are never lost.
+3. **Shell out to `cabal` for what it does well** — solving, building, testing.
+4. **Be strongly opinionated with transparent escape hatches** — every lint and default is individually configurable.
 
-## Building
+## Contributing
 
-```
-cargo build --workspace
-```
-
-## Testing
-
-```
-cargo test --workspace
+```sh
+cargo build --workspace   # Build everything
+cargo test --workspace    # Run all 690+ tests
+cargo clippy --workspace  # Check for common issues
 ```
 
 ## License

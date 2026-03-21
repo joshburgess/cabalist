@@ -1,5 +1,5 @@
 class Cabalist < Formula
-  desc "TUI tool for managing Haskell .cabal files"
+  desc "Interactive TUI, CLI, and LSP for managing Haskell .cabal files"
   homepage "https://github.com/joshburgess/cabalist"
   version "0.1.0"
   license any_of: ["MIT", "Apache-2.0"]
@@ -29,9 +29,11 @@ class Cabalist < Formula
   def install
     bin.install "cabalist"
     bin.install "cabalist-cli"
+    bin.install "cabalist-lsp"
   end
 
   test do
     system "#{bin}/cabalist-cli", "--version"
+    system "#{bin}/cabalist-lsp", "--help"
   end
 end

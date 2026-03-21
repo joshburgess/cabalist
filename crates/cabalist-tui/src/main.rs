@@ -172,6 +172,7 @@ fn render(frame: &mut ratatui::Frame, app: &App) {
         View::Extensions => views::extensions::render(frame, app, chunks[1]),
         View::Build => views::build::render(frame, app, chunks[1]),
         View::Metadata => views::metadata::render(frame, app, chunks[1]),
+        View::Project => views::project::render(frame, app, chunks[1]),
         View::Help => {
             // Render the underlying dashboard first, then the help overlay.
             views::dashboard::render(frame, app, chunks[1]);
@@ -530,6 +531,73 @@ fn handle_action(app: &mut App, action: Action) {
             app.metadata_edit_buffer.clear();
             app.set_status("Edit cancelled");
         }
+        Action::FormatFile => {
+            if let Err(e) = app.format_file() {
+                app.set_status(&format!("Format failed: {e}"));
+            }
+        }
+        Action::UpdateHackageIndex => {
+            app.current_view = View::Build;
+            app.build_output.clear();
+            app.spawn_hackage_update();
+        }
+        Action::ToggleDepsFilter => {
+            app.deps_filter_active = !app.deps_filter_active;
+            if !app.deps_filter_active {
+                app.deps_filter_query.clear();
+            }
+            app.selected_index = 0;
+        }
+        Action::DepsFilterInput(c) => {
+            app.deps_filter_query.push(c);
+            app.selected_index = 0;
+        }
+        Action::DepsFilterBackspace => {
+            app.deps_filter_query.pop();
+            app.selected_index = 0;
+        }
+        Action::ToggleDepsTreeMode => {
+            app.deps_tree_mode = !app.deps_tree_mode;
+            app.selected_index = 0;
+            let mode = if app.deps_tree_mode { "tree" } else { "list" };
+            app.set_status(&format!("Switched to {mode} view"));
+        }
+        Action::ProjectStartEdit => {
+            if let Some(ref project) = app.cabal_project {
+                let editable = views::project::editable_field_at(project, app.selected_index);
+                if let Some((_field_name, current_value)) = editable {
+                    app.project_edit_buffer = current_value;
+                    app.editing_project_field = true;
+                } else {
+                    app.set_status("This item is not editable");
+                }
+            }
+        }
+        Action::ProjectInput(c) => {
+            app.project_edit_buffer.push(c);
+        }
+        Action::ProjectBackspace => {
+            app.project_edit_buffer.pop();
+        }
+        Action::ProjectConfirm => {
+            if let Some(ref project) = app.cabal_project.clone() {
+                let editable = views::project::editable_field_at(project, app.selected_index);
+                if let Some((field_name, _)) = editable {
+                    let value = app.project_edit_buffer.clone();
+                    app.editing_project_field = false;
+                    match app.set_project_field(&field_name, &value) {
+                        Ok(()) => {}
+                        Err(e) => app.set_status(&format!("Failed: {e}")),
+                    }
+                }
+            }
+            app.editing_project_field = false;
+        }
+        Action::ProjectCancel => {
+            app.editing_project_field = false;
+            app.project_edit_buffer.clear();
+            app.set_status("Edit cancelled");
+        }
     }
 }
 
@@ -569,7 +637,7 @@ fn handle_mouse(app: &mut App, event: MouseEvent) {
             let row = event.row as usize;
 
             match app.current_view {
-                View::Dependencies | View::Extensions | View::Metadata => {
+                View::Dependencies | View::Extensions | View::Metadata | View::Project => {
                     // The bordered block starts at row 1 (header takes row 0),
                     // the block title/border takes 1 row, so items start ~row 3.
                     let list_start_row = 3;

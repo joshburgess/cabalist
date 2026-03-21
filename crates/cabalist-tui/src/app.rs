@@ -231,6 +231,7 @@ pub struct App {
     /// Detected GHC version (e.g. "9.8.2"), if available.
     pub ghc_version: Option<String>,
     /// The `base` library version corresponding to the detected GHC, if known.
+    #[allow(dead_code)]
     pub base_version: Option<String>,
     /// Parsed GHC diagnostics from the last completed build.
     pub build_diagnostics: Vec<cabalist_cabal::GhcDiagnostic>,
@@ -246,6 +247,20 @@ pub struct App {
     pub editing_metadata: bool,
     /// The text being edited for the current metadata field.
     pub metadata_edit_buffer: String,
+    /// Parsed cabal.project file, if one exists in the project root.
+    pub cabal_project: Option<cabalist_project::CabalProject>,
+    /// Whether the deps view is in tree mode (vs flat list).
+    pub deps_tree_mode: bool,
+    /// Whether the deps view is filtering inline (/ key) vs adding (a key).
+    pub deps_filter_active: bool,
+    /// The filter query for inline dep filtering.
+    pub deps_filter_query: String,
+    /// Whether we are in inline-edit mode for a project field.
+    pub editing_project_field: bool,
+    /// The text being edited for the current project field.
+    pub project_edit_buffer: String,
+    /// Path to the cabal.project file, if it exists.
+    pub cabal_project_path: Option<PathBuf>,
 }
 
 impl App {
@@ -271,6 +286,12 @@ impl App {
             .map(|s| s.to_string());
 
         let hackage_index = load_hackage_index_from_cache();
+        let cabal_project = load_cabal_project(project_root);
+        let cabal_project_path = if cabal_project.is_some() {
+            Some(project_root.join("cabal.project"))
+        } else {
+            None
+        };
 
         let mut app = Self {
             cabal_path,
@@ -303,6 +324,13 @@ impl App {
             hackage_index,
             editing_metadata: false,
             metadata_edit_buffer: String::new(),
+            cabal_project,
+            deps_tree_mode: false,
+            deps_filter_active: false,
+            deps_filter_query: String::new(),
+            editing_project_field: false,
+            project_edit_buffer: String::new(),
+            cabal_project_path,
         };
 
         app.refresh_lints();
@@ -327,6 +355,12 @@ impl App {
             .map(|s| s.to_string());
 
         let hackage_index = load_hackage_index_from_cache();
+        let cabal_project = load_cabal_project(project_root);
+        let cabal_project_path = if cabal_project.is_some() {
+            Some(project_root.join("cabal.project"))
+        } else {
+            None
+        };
 
         let app = Self {
             cabal_path,
@@ -359,6 +393,13 @@ impl App {
             hackage_index,
             editing_metadata: false,
             metadata_edit_buffer: String::new(),
+            cabal_project,
+            deps_tree_mode: false,
+            deps_filter_active: false,
+            deps_filter_query: String::new(),
+            editing_project_field: false,
+            project_edit_buffer: String::new(),
+            cabal_project_path,
         };
 
         Ok(app)
@@ -442,6 +483,12 @@ impl App {
                     self.selected_diagnostic = 0;
 
                     self.set_status(&format!("Build {status}"));
+
+                    // If the Hackage index was updated, reload it from cache.
+                    if self.build_output.iter().any(|l| l.contains("Index updated")) {
+                        self.hackage_index = load_hackage_index_from_cache();
+                    }
+
                     // Channel is done; don't put it back.
                     return;
                 }
@@ -632,9 +679,18 @@ impl App {
             View::Metadata => 13, // number of metadata fields
             View::Dependencies => {
                 let ast = self.ast();
-                count_deps_for_component(&ast, self.selected_component)
+                if self.deps_tree_mode {
+                    crate::views::deps::tree_mode_item_count(&ast)
+                } else {
+                    count_deps_for_component(&ast, self.selected_component)
+                }
             }
             View::Extensions => self.extensions_list_len(),
+            View::Project => self
+                .cabal_project
+                .as_ref()
+                .map(crate::views::project::item_count)
+                .unwrap_or(0),
             _ => 0,
         }
     }
@@ -995,6 +1051,145 @@ impl App {
         let available_count = all_ext.len().saturating_sub(enabled_count);
         enabled_count + available_count
     }
+
+    /// Spawn an async task to download/refresh the Hackage package index.
+    /// The result is stored back into `hackage_index` when complete.
+    pub fn spawn_hackage_update(&mut self) {
+        if self.build_running {
+            self.set_status("A build is running — try again later");
+            return;
+        }
+        self.set_status("Updating Hackage index...");
+
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<BuildEvent>();
+        self.build_rx = Some(rx);
+        self.build_running = true;
+
+        tokio::spawn(async move {
+            let cache_dir = match directories::ProjectDirs::from("", "", "cabalist") {
+                Some(dirs) => dirs.cache_dir().to_path_buf(),
+                None => {
+                    let _ = tx.send(BuildEvent::Error(
+                        "Could not determine cache directory".to_string(),
+                    ));
+                    return;
+                }
+            };
+
+            let _ = tx.send(BuildEvent::Line(
+                "Downloading Hackage index (~150MB)...".to_string(),
+            ));
+
+            match cabalist_hackage::client::update_index(&cache_dir).await {
+                Ok(index) => {
+                    let count = index.len();
+                    let _ = tx.send(BuildEvent::Line(format!(
+                        "Index updated: {count} packages"
+                    )));
+                    let _ = tx.send(BuildEvent::Complete {
+                        success: true,
+                        duration: std::time::Duration::ZERO,
+                    });
+                }
+                Err(e) => {
+                    let _ = tx.send(BuildEvent::Error(format!(
+                        "Failed to update index: {e}"
+                    )));
+                }
+            }
+        });
+    }
+
+
+    /// Format the .cabal file (round-trip through parser, optional sort).
+    pub fn format_file(&mut self) -> Result<(), String> {
+        let project_root = self
+            .cabal_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."));
+        let config = cabalist_opinions::config::find_and_load_config(project_root);
+
+        let mut current = self.source.clone();
+
+        // Sort dependencies if configured.
+        if config.formatting.sort_dependencies {
+            current = format_sort_list_field(&current, "build-depends");
+        }
+        if config.formatting.sort_modules {
+            current = format_sort_list_field(&current, "exposed-modules");
+            current = format_sort_list_field(&current, "other-modules");
+        }
+
+        // Round-trip through parser to normalize.
+        let result = cabalist_parser::parse(&current);
+        let formatted = result.cst.render();
+
+        if formatted == self.source {
+            self.set_status("Already formatted");
+            return Ok(());
+        }
+
+        self.undo_stack.push(self.source.clone());
+        self.source = formatted;
+        self.parse_result = cabalist_parser::parse(&self.source);
+        self.refresh_lints();
+        self.dirty = true;
+        self.set_status("Formatted");
+        Ok(())
+    }
+
+    /// Count unlisted .hs files in the project's source directories.
+    pub fn count_unlisted_modules(&self) -> usize {
+        let project_root = self
+            .cabal_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."));
+        let ast = self.ast();
+
+        let mut total = 0;
+        for comp in ast.all_components() {
+            let fields = comp.fields();
+            let source_dirs: Vec<&str> = if fields.hs_source_dirs.is_empty() {
+                vec!["."]
+            } else {
+                fields.hs_source_dirs.clone()
+            };
+
+            let mut listed: Vec<String> = Vec::new();
+            if let cabalist_parser::ast::Component::Library(lib) = &comp {
+                listed.extend(lib.exposed_modules.iter().map(|s| s.to_string()));
+            }
+            listed.extend(fields.other_modules.iter().map(|s| s.to_string()));
+
+            for src_dir in &source_dirs {
+                let dir = project_root.join(src_dir);
+                if dir.is_dir() {
+                    total += count_unlisted_in_dir(&dir, &dir, &listed);
+                }
+            }
+        }
+        total
+    }
+
+    /// Set a field in the cabal.project file (simple line-based editing).
+    pub fn set_project_field(&mut self, field_name: &str, value: &str) -> Result<(), String> {
+        let path = self
+            .cabal_project_path
+            .as_ref()
+            .ok_or_else(|| "No cabal.project file".to_string())?;
+
+        let source = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read cabal.project: {e}"))?;
+
+        let new_source = set_project_field_in_source(&source, field_name, value);
+
+        std::fs::write(path, &new_source)
+            .map_err(|e| format!("Failed to write cabal.project: {e}"))?;
+
+        self.cabal_project = Some(cabalist_project::parse(&new_source));
+        self.set_status(&format!("Updated {field_name} in cabal.project"));
+        Ok(())
+    }
 }
 
 /// Get dependency package names for a component by index.
@@ -1124,6 +1319,42 @@ fn create_project_dirs(
     Ok(())
 }
 
+/// Set a field value in cabal.project source text.
+///
+/// If the field exists, replaces its value. If not, appends it.
+fn set_project_field_in_source(source: &str, field_name: &str, value: &str) -> String {
+    let field_prefix = format!("{}:", field_name);
+    let mut lines: Vec<String> = source.lines().map(|l| l.to_string()).collect();
+    let mut found = false;
+
+    for line in &mut lines {
+        let trimmed = line.trim_start();
+        if trimmed.to_lowercase().starts_with(&field_prefix.to_lowercase()) {
+            *line = format!("{field_name}: {value}");
+            found = true;
+            break;
+        }
+    }
+
+    if !found {
+        lines.push(format!("{field_name}: {value}"));
+    }
+
+    let mut result = lines.join("\n");
+    if !result.ends_with('\n') {
+        result.push('\n');
+    }
+    result
+}
+
+/// Try to load and parse a `cabal.project` file from the given project root.
+///
+/// Returns `None` if no `cabal.project` file exists.
+fn load_cabal_project(project_root: &std::path::Path) -> Option<cabalist_project::CabalProject> {
+    cabalist_project::find_project_file(project_root)
+        .and_then(|path| cabalist_project::parse_file(&path).ok())
+}
+
 /// Try to load the Hackage index from the platform cache directory.
 ///
 /// Returns `None` if the cache file does not exist or cannot be read.
@@ -1161,4 +1392,163 @@ fn count_deps_for_component(ast: &CabalFile<'_>, idx: usize) -> usize {
         ci += 1;
     }
     0
+}
+
+/// Sort items in a list field across all sections (for formatting).
+fn format_sort_list_field(source: &str, field_name: &str) -> String {
+    use cabalist_parser::ast::{derive_ast, Component};
+    use cabalist_parser::edit::{self, EditBatch};
+
+    struct SectionKey {
+        keyword: String,
+        name: Option<String>,
+    }
+
+    let collect_keys = |source: &str| -> Vec<SectionKey> {
+        let result = cabalist_parser::parse(source);
+        let ast = derive_ast(&result.cst);
+        let mut keys = Vec::new();
+        for comp in ast.all_components() {
+            let key = match comp {
+                Component::Library(lib) => SectionKey {
+                    keyword: "library".to_string(),
+                    name: lib.fields.name.map(|s| s.to_string()),
+                },
+                Component::Executable(exe) => SectionKey {
+                    keyword: "executable".to_string(),
+                    name: exe.fields.name.map(|s| s.to_string()),
+                },
+                Component::TestSuite(ts) => SectionKey {
+                    keyword: "test-suite".to_string(),
+                    name: ts.fields.name.map(|s| s.to_string()),
+                },
+                Component::Benchmark(bm) => SectionKey {
+                    keyword: "benchmark".to_string(),
+                    name: bm.fields.name.map(|s| s.to_string()),
+                },
+            };
+            keys.push(key);
+        }
+        for cs in &ast.common_stanzas {
+            keys.push(SectionKey {
+                keyword: "common".to_string(),
+                name: Some(cs.name.to_string()),
+            });
+        }
+        keys
+    };
+
+    let find_sf = |source: &str, key: &SectionKey, fname: &str| -> Option<(cabalist_parser::ParseResult, cabalist_parser::span::NodeId, cabalist_parser::span::NodeId)> {
+        let result = cabalist_parser::parse(source);
+        let section_id = edit::find_section(&result.cst, &key.keyword, key.name.as_deref())?;
+        let field_id = edit::find_field(&result.cst, section_id, fname)?;
+        Some((result, section_id, field_id))
+    };
+
+    let extract_items = |cst: &cabalist_parser::cst::CabalCst, field_node: cabalist_parser::span::NodeId| -> Vec<String> {
+        use cabalist_parser::cst::CstNodeKind;
+        let node = &cst.nodes[field_node.0];
+        let mut items = Vec::new();
+        for &child_id in &node.children {
+            let child = &cst.nodes[child_id.0];
+            if matches!(child.kind, CstNodeKind::ValueLine) {
+                let text = &cst.source[child.span.start..child.span.end];
+                let text = text.trim().trim_start_matches(',').trim_end_matches(',').trim();
+                if !text.is_empty() {
+                    items.push(text.to_string());
+                }
+            }
+        }
+        if items.is_empty() {
+            if let Some(ref val) = node.field_value {
+                let text = &cst.source[val.start..val.end].trim();
+                for part in text.split(',') {
+                    let trimmed = part.trim();
+                    if !trimmed.is_empty() {
+                        items.push(trimmed.to_string());
+                    }
+                }
+            }
+        }
+        items
+    };
+
+    let keys = collect_keys(source);
+    let mut current = source.to_string();
+
+    for key in &keys {
+        let Some((result, _, field_id)) = find_sf(&current, key, field_name) else {
+            continue;
+        };
+        let items = extract_items(&result.cst, field_id);
+        if items.len() <= 1 {
+            continue;
+        }
+        let mut sorted = items.clone();
+        sorted.sort_by(|a, b| a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()));
+        if items == sorted {
+            continue;
+        }
+        for item in items.iter().rev() {
+            let Some((re, _, re_field)) = find_sf(&current, key, field_name) else { break };
+            let item_name = item.split_whitespace().next().unwrap_or(item);
+            let edits = edit::remove_list_item(&re.cst, re_field, item_name);
+            if !edits.is_empty() {
+                let mut batch = EditBatch::new();
+                batch.add_all(edits);
+                current = batch.apply(&re.cst.source);
+            }
+        }
+        for item in &sorted {
+            let Some((re, _, re_field)) = find_sf(&current, key, field_name) else { break };
+            let edits = edit::add_list_item(&re.cst, re_field, item, false);
+            if !edits.is_empty() {
+                let mut batch = EditBatch::new();
+                batch.add_all(edits);
+                current = batch.apply(&re.cst.source);
+            }
+        }
+    }
+
+    current
+}
+
+/// Recursively count .hs files not listed in the module lists.
+fn count_unlisted_in_dir(
+    base: &std::path::Path,
+    dir: &std::path::Path,
+    listed: &[String],
+) -> usize {
+    let mut count = 0;
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return 0,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            count += count_unlisted_in_dir(base, &path, listed);
+        } else if path.extension().is_some_and(|ext| ext == "hs") {
+            if let Some(module_name) = path_to_module_name(base, &path) {
+                if !listed.iter().any(|m| m == &module_name) {
+                    count += 1;
+                }
+            }
+        }
+    }
+    count
+}
+
+/// Convert a .hs file path to a Haskell module name.
+fn path_to_module_name(base: &std::path::Path, file: &std::path::Path) -> Option<String> {
+    let relative = file.strip_prefix(base).ok()?;
+    let stem = relative.with_extension("");
+    let components: Vec<&str> = stem
+        .components()
+        .filter_map(|c| c.as_os_str().to_str())
+        .collect();
+    if components.is_empty() {
+        return None;
+    }
+    Some(components.join("."))
 }

@@ -1,7 +1,7 @@
 {
   "name": "cabalist",
   "displayName": "Cabalist - Haskell .cabal Support",
-  "description": "Language support for Haskell .cabal files powered by cabalist",
+  "description": "Language support for Haskell .cabal files powered by cabalist — syntax highlighting, completions, diagnostics, and quick fixes",
   "version": "0.1.0",
   "publisher": "cabalist",
   "license": "MIT OR Apache-2.0",
@@ -13,10 +13,21 @@
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Linters",
+    "Snippets"
   ],
+  "keywords": [
+    "haskell",
+    "cabal",
+    "cabal-file",
+    "pvp",
+    "ghc"
+  ],
+  "icon": "icon.png",
   "activationEvents": [
-    "onLanguage:cabal"
+    "onLanguage:cabal",
+    "workspaceContains:**/*.cabal"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -31,6 +42,46 @@
           ".cabal"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "cabal-project",
+        "aliases": [
+          "Cabal Project"
+        ],
+        "filenames": [
+          "cabal.project",
+          "cabal.project.local",
+          "cabal.project.freeze"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cabal",
+        "scopeName": "source.cabal",
+        "path": "./syntaxes/cabal.tmLanguage.json"
+      },
+      {
+        "language": "cabal-project",
+        "scopeName": "source.cabal",
+        "path": "./syntaxes/cabal.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "cabal",
+        "path": "./snippets/cabal.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "cabalist.restartServer",
+        "title": "Cabalist: Restart Language Server"
+      },
+      {
+        "command": "cabalist.showOutput",
+        "title": "Cabalist: Show Output Channel"
       }
     ],
     "configuration": {
@@ -39,7 +90,13 @@
         "cabalist.serverPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the cabalist-lsp binary. If empty, searches PATH."
+          "markdownDescription": "Path to the `cabalist-lsp` binary. If empty, searches `PATH`."
+        },
+        "cabalist.serverArgs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "Additional arguments passed to `cabalist-lsp`."
         },
         "cabalist.trace.server": {
           "type": "string",
@@ -50,6 +107,11 @@
           ],
           "default": "off",
           "description": "Traces the communication between VS Code and the cabalist language server."
+        },
+        "cabalist.enableLsp": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the cabalist language server for diagnostics, completions, and hover."
         }
       }
     }
@@ -59,11 +121,14 @@
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
     "typescript": "^5.3.0"
   },
   "scripts": {
     "compile": "tsc -b",
     "watch": "tsc -b -w",
+    "lint": "tsc --noEmit",
+    "package": "vsce package --no-dependencies",
     "vscode:prepublish": "npm run compile"
   }
 }

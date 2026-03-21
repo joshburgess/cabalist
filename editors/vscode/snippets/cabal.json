@@ -1,0 +1,134 @@
+{
+  "Library Section": {
+    "prefix": "library",
+    "body": [
+      "library",
+      "  import: ${1:common-settings}",
+      "  exposed-modules:",
+      "    ${2:Lib}",
+      "  build-depends:",
+      "    ${3:base ^>=${4:4.17}}",
+      ""
+    ],
+    "description": "Add a library section"
+  },
+  "Executable Section": {
+    "prefix": "executable",
+    "body": [
+      "executable ${1:app-name}",
+      "  import: ${2:common-settings}",
+      "  main-is: ${3:Main.hs}",
+      "  hs-source-dirs: ${4:app}",
+      "  build-depends:",
+      "    ${5:base ^>=${6:4.17}}",
+      ""
+    ],
+    "description": "Add an executable section"
+  },
+  "Test Suite Section": {
+    "prefix": "test-suite",
+    "body": [
+      "test-suite ${1:test-name}",
+      "  import: ${2:common-settings}",
+      "  type: exitcode-stdio-1.0",
+      "  main-is: ${3:Main.hs}",
+      "  hs-source-dirs: ${4:test}",
+      "  build-depends:",
+      "    ${5:base ^>=${6:4.17}}",
+      ""
+    ],
+    "description": "Add a test suite section"
+  },
+  "Benchmark Section": {
+    "prefix": "benchmark",
+    "body": [
+      "benchmark ${1:bench-name}",
+      "  import: ${2:common-settings}",
+      "  type: exitcode-stdio-1.0",
+      "  main-is: ${3:Main.hs}",
+      "  hs-source-dirs: ${4:bench}",
+      "  build-depends:",
+      "    ${5:base ^>=${6:4.17}},",
+      "    ${7:criterion ^>=${8:1.6}}",
+      ""
+    ],
+    "description": "Add a benchmark section"
+  },
+  "Common Stanza": {
+    "prefix": "common",
+    "body": [
+      "common ${1:common-settings}",
+      "  default-language: ${2:GHC2021}",
+      "  ghc-options:",
+      "    -Wall",
+      "    -Wcompat",
+      "    -Widentities",
+      "    -Wincomplete-record-updates",
+      "    -Wincomplete-uni-patterns",
+      "    -Wmissing-deriving-strategies",
+      "    -Wredundant-constraints",
+      "    -Wunused-packages",
+      "  default-extensions:",
+      "    ${3:OverloadedStrings}",
+      ""
+    ],
+    "description": "Add a common stanza with recommended settings"
+  },
+  "Flag Section": {
+    "prefix": "flag",
+    "body": [
+      "flag ${1:flag-name}",
+      "  description: ${2:Enable $1}",
+      "  default: ${3|True,False|}",
+      "  manual: ${4|True,False|}",
+      ""
+    ],
+    "description": "Add a flag section"
+  },
+  "Source Repository": {
+    "prefix": "source-repository",
+    "body": [
+      "source-repository head",
+      "  type: git",
+      "  location: ${1:https://github.com/USER/REPO.git}",
+      ""
+    ],
+    "description": "Add a source-repository head section"
+  },
+  "Conditional Block": {
+    "prefix": "if",
+    "body": [
+      "if ${1|flag(name),os(linux),arch(x86_64),impl(ghc >= 9.0)|}",
+      "  ${2:build-depends: $3}",
+      ""
+    ],
+    "description": "Add a conditional block"
+  },
+  "PVP Dependency": {
+    "prefix": "dep",
+    "body": "${1:package-name} ^>=${2:0.1}",
+    "description": "Add a dependency with PVP major bound"
+  },
+  "Cabal File Header": {
+    "prefix": "cabal-header",
+    "body": [
+      "cabal-version: 3.0",
+      "name: ${1:package-name}",
+      "version: ${2:0.1.0.0}",
+      "synopsis: ${3:Short description}",
+      "description: ${4:Longer description}",
+      "license: ${5|MIT,BSD-3-Clause,BSD-2-Clause,Apache-2.0,ISC,MPL-2.0|}",
+      "license-file: LICENSE",
+      "author: ${6:Author Name}",
+      "maintainer: ${7:email@example.com}",
+      "category: ${8:Development}",
+      "build-type: Simple",
+      "",
+      "source-repository head",
+      "  type: git",
+      "  location: ${9:https://github.com/USER/REPO.git}",
+      ""
+    ],
+    "description": "Generate a complete .cabal file header"
+  }
+}

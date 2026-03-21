@@ -50,10 +50,12 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
             lines.push(help_line(theme, "e", "Go to Extensions"));
             lines.push(help_line(theme, "b", "Go to Build"));
             lines.push(help_line(theme, "m", "Go to Metadata"));
+            lines.push(help_line(theme, "p", "Go to Project"));
         }
         View::Dependencies => {
             lines.push(help_line(theme, "a", "Add dependency"));
             lines.push(help_line(theme, "r", "Remove dependency"));
+            lines.push(help_line(theme, "v", "Toggle list/tree view"));
         }
         View::Extensions => {
             lines.push(help_line(theme, "Space", "Toggle extension"));
@@ -65,6 +67,10 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
             lines.push(help_line(theme, "c", "Run cabal clean"));
         }
         View::Metadata => {
+            lines.push(help_line(theme, "Enter", "Edit selected field"));
+        }
+        View::Project => {
+            lines.push(help_line(theme, "j/k", "Navigate items"));
             lines.push(help_line(theme, "Enter", "Edit selected field"));
         }
         View::Init => {

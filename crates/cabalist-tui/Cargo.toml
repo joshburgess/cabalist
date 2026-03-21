@@ -10,6 +10,10 @@ keywords.workspace = true
 categories.workspace = true
 publish = false
 
+[lib]
+name = "cabalist_tui"
+path = "src/lib.rs"
+
 [[bin]]
 name = "cabalist"
 path = "src/main.rs"
@@ -17,9 +21,10 @@ path = "src/main.rs"
 [dependencies]
 cabalist-parser = { path = "../cabalist-parser" }
 cabalist-ghc = { path = "../cabalist-ghc" }
-cabalist-hackage = { path = "../cabalist-hackage" }
+cabalist-hackage = { path = "../cabalist-hackage", features = ["network"] }
 cabalist-opinions = { path = "../cabalist-opinions" }
 cabalist-cabal = { path = "../cabalist-cabal" }
+cabalist-project = { path = "../cabalist-project" }
 ratatui = "0.29"
 crossterm = "0.28"
 clap = { version = "4", features = ["derive"] }

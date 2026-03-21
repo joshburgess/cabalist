@@ -106,8 +106,6 @@ enum CompletionContext {
     SectionKeyword,
     /// Cursor is after an `if` keyword.
     Condition,
-    /// Unknown context.
-    Unknown,
 }
 
 /// Compute completions for the given position in a document.
@@ -155,7 +153,6 @@ pub fn completions(
         CompletionContext::FieldValue { field_name } => {
             complete_field_value(&field_name, &doc.source, &doc.line_index, hackage)
         }
-        CompletionContext::Unknown => Vec::new(),
     }
 }
 

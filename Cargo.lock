@@ -282,6 +282,7 @@ dependencies = [
  "cabalist-hackage",
  "cabalist-opinions",
  "cabalist-parser",
+ "cabalist-project",
  "clap",
  "crossterm",
  "directories",

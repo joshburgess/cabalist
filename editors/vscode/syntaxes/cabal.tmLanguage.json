@@ -1,0 +1,93 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Cabal",
+  "scopeName": "source.cabal",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#section-header" },
+    { "include": "#conditional" },
+    { "include": "#field" },
+    { "include": "#version-constraint" }
+  ],
+  "repository": {
+    "comment": {
+      "match": "^\\s*--.*$",
+      "name": "comment.line.double-dash.cabal"
+    },
+    "section-header": {
+      "patterns": [
+        {
+          "match": "^(library|executable|test-suite|benchmark|common|flag|source-repository)\\b(.*)?$",
+          "captures": {
+            "1": { "name": "keyword.other.section.cabal" },
+            "2": { "name": "entity.name.section.cabal" }
+          }
+        }
+      ]
+    },
+    "conditional": {
+      "patterns": [
+        {
+          "match": "^\\s*(if|else|elif)\\b",
+          "captures": {
+            "1": { "name": "keyword.control.conditional.cabal" }
+          }
+        },
+        {
+          "match": "\\b(flag|os|arch|impl)\\s*\\(",
+          "captures": {
+            "1": { "name": "support.function.condition.cabal" }
+          }
+        },
+        {
+          "match": "\\b(True|False)\\b",
+          "name": "constant.language.boolean.cabal"
+        }
+      ]
+    },
+    "field": {
+      "patterns": [
+        {
+          "match": "^\\s*(cabal-version|name|version|synopsis|description|license|license-file|author|maintainer|homepage|bug-reports|category|build-type|tested-with|extra-source-files|extra-doc-files|data-files|data-dir)\\s*(:)",
+          "captures": {
+            "1": { "name": "variable.other.field.toplevel.cabal" },
+            "2": { "name": "punctuation.separator.key-value.cabal" }
+          }
+        },
+        {
+          "match": "^\\s*(build-depends|exposed-modules|other-modules|hs-source-dirs|default-language|default-extensions|other-extensions|ghc-options|ghc-prof-options|import|main-is|type|build-tool-depends|mixins|autogen-modules|reexported-modules|signatures|cpp-options|cc-options|ld-options|pkgconfig-depends|frameworks|extra-libraries|extra-lib-dirs|includes|include-dirs|c-sources|js-sources)\\s*(:)",
+          "captures": {
+            "1": { "name": "variable.other.field.section.cabal" },
+            "2": { "name": "punctuation.separator.key-value.cabal" }
+          }
+        },
+        {
+          "match": "^\\s*([a-zA-Z][a-zA-Z0-9_-]*)\\s*(:)",
+          "captures": {
+            "1": { "name": "variable.other.field.cabal" },
+            "2": { "name": "punctuation.separator.key-value.cabal" }
+          }
+        }
+      ]
+    },
+    "version-constraint": {
+      "patterns": [
+        {
+          "match": "(\\^>=|>=|<=|==|>|<)\\s*([0-9]+(\\.[0-9]+)*)",
+          "captures": {
+            "1": { "name": "keyword.operator.version.cabal" },
+            "2": { "name": "constant.numeric.version.cabal" }
+          }
+        },
+        {
+          "match": "\\b([0-9]+(\\.[0-9]+)+)\\b",
+          "name": "constant.numeric.version.cabal"
+        },
+        {
+          "match": "(&&|\\|\\|)",
+          "name": "keyword.operator.logical.cabal"
+        }
+      ]
+    }
+  }
+}

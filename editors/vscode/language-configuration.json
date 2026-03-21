@@ -10,5 +10,16 @@
   "surroundingPairs": [
     { "open": "(", "close": ")" },
     { "open": "\"", "close": "\"" }
-  ]
+  ],
+  "folding": {
+    "markers": {
+      "start": "^(library|executable|test-suite|benchmark|common|flag|source-repository)\\b",
+      "end": "^(?=\\S)"
+    }
+  },
+  "indentationRules": {
+    "increaseIndentPattern": "^(library|executable|test-suite|benchmark|common|flag|source-repository|if|else)\\b",
+    "decreaseIndentPattern": "^\\s*(else)\\b"
+  },
+  "wordPattern": "[a-zA-Z][a-zA-Z0-9_-]*"
 }

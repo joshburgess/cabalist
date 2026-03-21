@@ -63,31 +63,222 @@ fn action_for_lint(
         }
         "missing-synopsis" => {
             let insert_pos = find_top_level_insert_position(&doc.source, &doc.line_index);
+            let pkg_name = extract_package_name(&doc.source);
+            let synopsis_text = match &pkg_name {
+                Some(name) => format!("synopsis: {name}\n"),
+                None => "synopsis: A short description of the package\n".to_string(),
+            };
             Some(make_edit_action(
                 "Add `synopsis` field",
                 uri,
                 insert_pos,
-                "synopsis: TODO\n",
+                &synopsis_text,
                 diag,
             ))
         }
         "missing-description" => {
             let insert_pos = find_top_level_insert_position(&doc.source, &doc.line_index);
+            let pkg_name = extract_package_name(&doc.source);
+            let desc_text = match &pkg_name {
+                Some(name) => format!("description: Please see the README for {name}\n"),
+                None => "description: Please see the README\n".to_string(),
+            };
             Some(make_edit_action(
                 "Add `description` field",
                 uri,
                 insert_pos,
-                "description: TODO\n",
+                &desc_text,
                 diag,
             ))
         }
         "missing-bug-reports" => {
             let insert_pos = find_top_level_insert_position(&doc.source, &doc.line_index);
+            let bug_url = extract_repo_url(&doc.source)
+                .map(|repo| format!("{repo}/issues"))
+                .unwrap_or_else(|| "https://github.com/OWNER/REPO/issues".to_string());
             Some(make_edit_action(
                 "Add `bug-reports` field",
                 uri,
                 insert_pos,
-                "bug-reports: https://github.com/OWNER/REPO/issues\n",
+                &format!("bug-reports: {bug_url}\n"),
+                diag,
+            ))
+        }
+        "missing-source-repo" => {
+            let insert_pos = find_top_level_insert_position(&doc.source, &doc.line_index);
+            let repo_url = extract_homepage(&doc.source)
+                .unwrap_or_else(|| "https://github.com/OWNER/REPO".to_string());
+            let text = format!(
+                "\nsource-repository head\n  type: git\n  location: {repo_url}.git\n"
+            );
+            Some(make_edit_action(
+                "Add `source-repository` section",
+                uri,
+                insert_pos,
+                &text,
+                diag,
+            ))
+        }
+        "missing-upper-bound" => {
+            // The diagnostic message contains the package name and current constraint.
+            // Extract the package name from: "Dependency 'pkg' has no upper version bound (>=X.Y)"
+            let pkg_name = diag.message
+                .find('\'')
+                .and_then(|start| {
+                    let rest = &diag.message[start + 1..];
+                    rest.find('\'').map(|end| &rest[..end])
+                });
+            let Some(pkg_name) = pkg_name else {
+                return None;
+            };
+
+            // Find the dependency in the CST and replace its version range with ^>=.
+            // Extract the lower bound version from the diagnostic message.
+            let lower_version = diag.message
+                .find("(>=")
+                .map(|start| {
+                    let rest = &diag.message[start + 3..];
+                    rest.find(')').map(|end| rest[..end].trim().to_string())
+                })
+                .flatten();
+
+            if let Some(version) = lower_version {
+                // Replace the version constraint at the diagnostic range with ^>= bounds.
+                Some(make_replace_action(
+                    &format!("Add PVP upper bound: ^>={version}"),
+                    uri,
+                    diag.range,
+                    &format!("{pkg_name} ^>={version}"),
+                    diag,
+                ))
+            } else {
+                None
+            }
+        }
+        "duplicate-dep" => {
+            // The diagnostic range points to the duplicate dependency line.
+            // The fix is to remove it (replace with empty string).
+            Some(make_replace_action(
+                "Remove duplicate dependency",
+                uri,
+                Range {
+                    start: Position {
+                        line: diag.range.start.line,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: diag.range.end.line + 1,
+                        character: 0,
+                    },
+                },
+                "",
+                diag,
+            ))
+        }
+        "missing-lower-bound" => {
+            // Extract package name from: "Dependency 'pkg' has no lower version bound (<X.Y)."
+            let pkg_name = extract_quoted_name(&diag.message)?;
+
+            // Extract the upper bound version from the constraint in parens.
+            let upper_version = diag.message
+                .find("(<")
+                .map(|start| {
+                    let rest = &diag.message[start + 2..];
+                    rest.find(')').map(|end| rest[..end].trim().to_string())
+                })
+                .flatten();
+
+            if let Some(version) = upper_version {
+                Some(make_replace_action(
+                    &format!("Add PVP bounds: ^>={version}"),
+                    uri,
+                    diag.range,
+                    &format!("{pkg_name} ^>={version}"),
+                    diag,
+                ))
+            } else {
+                None
+            }
+        }
+        "wide-any-version" => {
+            // The package has no meaningful constraint. We can't know the right version
+            // without Hackage, so suggest the user add bounds manually.
+            // We still offer to add a placeholder ^>=0.1 constraint.
+            let pkg_name = extract_quoted_name(&diag.message)?;
+            Some(make_replace_action(
+                &format!("Add placeholder bounds for '{pkg_name}'"),
+                uri,
+                diag.range,
+                &format!("{pkg_name} ^>=0.1"),
+                diag,
+            ))
+        }
+        "ghc-options-werror" => {
+            // The fix: remove -Werror from ghc-options. Since we can't easily edit
+            // a single item in a ghc-options list via ranges, offer to wrap it in a flag.
+            // For simplicity, just offer to remove the line containing -Werror.
+            None // Too complex for a simple text replacement — skip for now.
+        }
+        "exposed-no-modules" => {
+            // Insert an exposed-modules field after the section header.
+            let insert_pos = Position {
+                line: diag.range.start.line + 1,
+                character: 0,
+            };
+            Some(make_edit_action(
+                "Add `exposed-modules` field",
+                uri,
+                insert_pos,
+                "  exposed-modules: MyModule\n",
+                diag,
+            ))
+        }
+        "unused-flag" => {
+            // Remove the entire flag section (from the flag line to the next section).
+            Some(make_replace_action(
+                "Remove unused flag",
+                uri,
+                Range {
+                    start: Position {
+                        line: diag.range.start.line,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: diag.range.end.line + 1,
+                        character: 0,
+                    },
+                },
+                "",
+                diag,
+            ))
+        }
+        "stale-tested-with" => {
+            // Remove the stale tested-with entry. For simplicity, clear the field.
+            let result = cabalist_parser::parse(&doc.source);
+            if let Some(field_id) =
+                cabalist_parser::edit::find_field(&result.cst, result.cst.root, "tested-with")
+            {
+                let node = &result.cst.nodes[field_id.0];
+                let range = doc.line_index.span_to_range(node.span);
+                Some(make_replace_action(
+                    "Remove stale `tested-with` field",
+                    uri,
+                    range,
+                    "",
+                    diag,
+                ))
+            } else {
+                None
+            }
+        }
+        "no-common-stanza" => {
+            // Insert a common stanza template before the first section.
+            let insert_pos = find_top_level_insert_position(&doc.source, &doc.line_index);
+            Some(make_edit_action(
+                "Add a `common` stanza",
+                uri,
+                insert_pos,
+                "\ncommon warnings\n  ghc-options: -Wall\n  default-language: GHC2021\n\n",
                 diag,
             ))
         }
@@ -108,6 +299,55 @@ fn action_for_lint(
         }
         _ => None,
     }
+}
+
+/// Extract a single-quoted name from a diagnostic message (e.g., "Dependency 'pkg' ...").
+fn extract_quoted_name(message: &str) -> Option<String> {
+    let start = message.find('\'')?;
+    let rest = &message[start + 1..];
+    let end = rest.find('\'')?;
+    Some(rest[..end].to_string())
+}
+
+/// Extract the package name from a `.cabal` source for use in generated text.
+fn extract_package_name(source: &str) -> Option<String> {
+    for line in source.lines() {
+        let trimmed = line.trim();
+        let lower = trimmed.to_lowercase();
+        if lower.starts_with("name:") {
+            let value = trimmed["name:".len()..].trim();
+            if !value.is_empty() {
+                return Some(value.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Extract the homepage URL from a `.cabal` source.
+fn extract_homepage(source: &str) -> Option<String> {
+    for line in source.lines() {
+        let trimmed = line.trim();
+        let lower = trimmed.to_lowercase();
+        if lower.starts_with("homepage:") {
+            let value = trimmed["homepage:".len()..].trim();
+            if !value.is_empty() {
+                return Some(value.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Extract the source-repository URL from a `.cabal` source for deriving bug-reports.
+fn extract_repo_url(source: &str) -> Option<String> {
+    // Try homepage first (often a GitHub URL).
+    if let Some(url) = extract_homepage(source) {
+        if url.contains("github.com") || url.contains("gitlab.com") {
+            return Some(url.trim_end_matches(".git").to_string());
+        }
+    }
+    None
 }
 
 /// Find a good position to insert a new top-level field.
@@ -171,7 +411,7 @@ fn make_edit_action(
 /// Check if a code action would be generated for a given lint ID.
 #[cfg(test)]
 fn has_action_for_lint(lint_id: &str) -> bool {
-    let source = "cabal-version: 2.4\nname: test\nversion: 0.1\n\nlibrary\n  exposed-modules: Lib\n  build-depends: base ^>=4.17\n";
+    let source = "cabal-version: 2.4\nname: test-pkg\nversion: 0.1\nhomepage: https://github.com/user/test-pkg\n\nlibrary\n  exposed-modules: Lib\n  build-depends: base ^>=4.17\n";
     let doc = crate::state::DocumentState::new(source.to_string(), 1);
     let uri = Url::parse("file:///test.cabal").unwrap();
 
@@ -248,8 +488,110 @@ mod tests {
     }
 
     #[test]
+    fn action_exists_for_missing_source_repo() {
+        assert!(has_action_for_lint("missing-source-repo"));
+    }
+
+    #[test]
     fn no_action_for_unknown_lint() {
         assert!(!has_action_for_lint("some-unknown-lint"));
+    }
+
+    #[test]
+    fn synopsis_action_uses_package_name() {
+        let source = "cabal-version: 3.0\nname: my-cool-lib\nversion: 0.1\n";
+        let doc = crate::state::DocumentState::new(source.to_string(), 1);
+        let uri = Url::parse("file:///test.cabal").unwrap();
+        let diag = Diagnostic {
+            range: Range::default(),
+            source: Some("cabalist".into()),
+            code: Some(NumberOrString::String("missing-synopsis".into())),
+            message: "test".into(),
+            ..Default::default()
+        };
+        let action = action_for_lint(&doc, &uri, Path::new("."), &diag, "missing-synopsis").unwrap();
+        let edit = action.edit.unwrap();
+        let changes = edit.changes.unwrap();
+        let edits = changes.get(&uri).unwrap();
+        assert!(
+            edits[0].new_text.contains("my-cool-lib"),
+            "synopsis should use the package name, got: {}",
+            edits[0].new_text
+        );
+    }
+
+    #[test]
+    fn description_action_uses_package_name() {
+        let source = "cabal-version: 3.0\nname: my-cool-lib\nversion: 0.1\n";
+        let doc = crate::state::DocumentState::new(source.to_string(), 1);
+        let uri = Url::parse("file:///test.cabal").unwrap();
+        let diag = Diagnostic {
+            range: Range::default(),
+            source: Some("cabalist".into()),
+            code: Some(NumberOrString::String("missing-description".into())),
+            message: "test".into(),
+            ..Default::default()
+        };
+        let action = action_for_lint(&doc, &uri, Path::new("."), &diag, "missing-description").unwrap();
+        let edit = action.edit.unwrap();
+        let changes = edit.changes.unwrap();
+        let edits = changes.get(&uri).unwrap();
+        assert!(
+            edits[0].new_text.contains("my-cool-lib"),
+            "description should reference the package name"
+        );
+    }
+
+    #[test]
+    fn action_exists_for_missing_upper_bound() {
+        let source = "cabal-version: 3.0\nname: test-pkg\nversion: 0.1\nhomepage: https://github.com/user/test-pkg\n\nlibrary\n  exposed-modules: Lib\n  build-depends: base >=4.17\n";
+        let doc = crate::state::DocumentState::new(source.to_string(), 1);
+        let uri = Url::parse("file:///test.cabal").unwrap();
+        let diag = Diagnostic {
+            range: Range {
+                start: Position { line: 7, character: 17 },
+                end: Position { line: 7, character: 29 },
+            },
+            source: Some("cabalist".into()),
+            code: Some(NumberOrString::String("missing-upper-bound".into())),
+            message: "Dependency 'base' has no upper version bound (>=4.17). This violates the PVP.".into(),
+            ..Default::default()
+        };
+        let action = action_for_lint(&doc, &uri, Path::new("."), &diag, "missing-upper-bound");
+        assert!(action.is_some());
+        let action = action.unwrap();
+        let edit = action.edit.unwrap();
+        let changes = edit.changes.unwrap();
+        let edits = changes.get(&uri).unwrap();
+        assert!(edits[0].new_text.contains("^>=4.17"), "should add PVP bound, got: {}", edits[0].new_text);
+    }
+
+    #[test]
+    fn action_exists_for_duplicate_dep() {
+        assert!(has_action_for_lint("duplicate-dep"));
+    }
+
+    #[test]
+    fn bug_reports_action_uses_homepage() {
+        let source = "cabal-version: 3.0\nname: test\nversion: 0.1\nhomepage: https://github.com/user/repo\n";
+        let doc = crate::state::DocumentState::new(source.to_string(), 1);
+        let uri = Url::parse("file:///test.cabal").unwrap();
+        let diag = Diagnostic {
+            range: Range::default(),
+            source: Some("cabalist".into()),
+            code: Some(NumberOrString::String("missing-bug-reports".into())),
+            message: "test".into(),
+            ..Default::default()
+        };
+        let action = action_for_lint(&doc, &uri, Path::new("."), &diag, "missing-bug-reports").unwrap();
+        let edit = action.edit.unwrap();
+        let changes = edit.changes.unwrap();
+        let edits = changes.get(&uri).unwrap();
+        assert!(
+            edits[0].new_text.contains("https://github.com/user/repo/issues"),
+            "bug-reports should derive from homepage, got: {}",
+            edits[0].new_text
+        );
     }
 
     #[test]

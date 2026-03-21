@@ -101,6 +101,30 @@ enum Command {
     },
     /// Show project summary
     Info,
+    /// List or toggle GHC extensions
+    Extensions {
+        /// Toggle an extension on/off
+        #[arg(long)]
+        toggle: Option<String>,
+        /// Target component
+        #[arg(long, default_value = "library")]
+        component: String,
+    },
+    /// Set a top-level metadata field
+    Set {
+        /// Field name (e.g. name, version, synopsis, license, author)
+        field: String,
+        /// New value
+        value: String,
+    },
+    /// Run `cabal build`
+    Build,
+    /// Run `cabal test`
+    Test,
+    /// Run `cabal clean`
+    Clean,
+    /// Download or update the Hackage package index
+    UpdateIndex,
 }
 
 #[derive(Clone, Copy, clap::ValueEnum)]
@@ -135,6 +159,14 @@ fn main() -> ExitCode {
         Command::Deps { tree, outdated } => commands::deps::run(&cli.file, tree, outdated),
         Command::Modules { scan, component } => commands::modules::run(&cli.file, scan, &component),
         Command::Info => commands::info::run(&cli.file, cli.format),
+        Command::Extensions { toggle, component } => {
+            commands::extensions::run(&cli.file, toggle.as_deref(), &component)
+        }
+        Command::Set { field, value } => commands::set::run(&cli.file, &field, &value),
+        Command::Build => commands::build::run_build(&cli.file),
+        Command::Test => commands::build::run_test(&cli.file),
+        Command::Clean => commands::build::run_clean(&cli.file),
+        Command::UpdateIndex => commands::update_index::run(),
     };
 
     match result {

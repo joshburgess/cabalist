@@ -6,10 +6,16 @@
 mod actions;
 mod completions;
 mod convert;
+mod definition;
 mod diagnostics;
+mod formatting;
 mod hover;
+mod inlay_hints;
+mod rename;
+mod semantic_tokens;
 mod server;
 mod state;
+mod symbols;
 
 use tower_lsp::{LspService, Server};
 

@@ -9,7 +9,7 @@
 use crate::error::HackageError;
 use crate::index::HackageIndex;
 use crate::types::{PackageInfo, Version};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
@@ -107,7 +107,10 @@ async fn download_index_file(index_path: &Path, timestamp_path: &Path) -> Result
 /// The tarball contains one `.cabal` file per package version, organized as:
 /// `<package-name>/<version>/<package-name>.cabal`
 ///
-/// We extract the package name, version, and synopsis from each entry.
+/// It also contains `<package-name>/preferred-versions` files that indicate
+/// deprecation or version preferences via version range constraints.
+///
+/// We extract the package name, version, synopsis, and deprecation status.
 fn parse_index_tarball(tarball_path: &Path) -> Result<HackageIndex, HackageError> {
     let file = std::fs::File::open(tarball_path)?;
     let decoder = flate2::read::GzDecoder::new(file);
@@ -115,6 +118,9 @@ fn parse_index_tarball(tarball_path: &Path) -> Result<HackageIndex, HackageError
 
     // Collect package name -> (versions, synopsis).
     let mut packages: HashMap<String, (Vec<Version>, String)> = HashMap::new();
+    // Track packages whose preferred-versions file indicates deprecation
+    // (an empty version range means "no versions are preferred" = deprecated).
+    let mut deprecated_packages: HashSet<String> = HashSet::new();
 
     for entry in archive.entries()? {
         let mut entry = match entry {
@@ -127,8 +133,28 @@ fn parse_index_tarball(tarball_path: &Path) -> Result<HackageIndex, HackageError
             Err(_) => continue,
         };
 
-        // We only care about .cabal files.
         let path_str = path.to_string_lossy().to_string();
+
+        // Check for preferred-versions files: <name>/preferred-versions
+        if path_str.ends_with("/preferred-versions") {
+            let parts: Vec<&str> = path_str.split('/').collect();
+            if parts.len() == 2 {
+                let pkg_name = parts[0].to_string();
+                let mut content = String::new();
+                if entry.read_to_string(&mut content).is_ok() {
+                    if is_deprecated_by_preferred_versions(&content) {
+                        deprecated_packages.insert(pkg_name);
+                    } else {
+                        // A non-empty preferred-versions means it's not deprecated
+                        // (it may have been un-deprecated). Remove from set.
+                        deprecated_packages.remove(&pkg_name);
+                    }
+                }
+            }
+            continue;
+        }
+
+        // We only care about .cabal files.
         if !path_str.ends_with(".cabal") {
             continue;
         }
@@ -168,17 +194,57 @@ fn parse_index_tarball(tarball_path: &Path) -> Result<HackageIndex, HackageError
     let package_list: Vec<PackageInfo> = packages
         .into_iter()
         .map(|(name, (mut versions, synopsis))| {
+            let deprecated = deprecated_packages.contains(&name);
             versions.sort();
             PackageInfo {
                 name,
                 synopsis,
                 versions,
-                deprecated: false, // TODO: check preferred-versions
+                deprecated,
             }
         })
         .collect();
 
     Ok(HackageIndex::from_packages(package_list))
+}
+
+/// Check if a `preferred-versions` file indicates that a package is deprecated.
+///
+/// The preferred-versions file format is one line per package:
+/// `<package-name> <version-range>`
+///
+/// A package is considered deprecated when:
+/// - The file is empty or contains only whitespace/comments
+/// - The version range effectively excludes all versions (e.g., `<0` or empty range)
+///
+/// Non-empty version ranges (e.g., `aeson >=2.0`) mean the package is NOT deprecated,
+/// just that certain versions are preferred over others.
+fn is_deprecated_by_preferred_versions(content: &str) -> bool {
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return true;
+    }
+
+    // Each line is: <package-name> <version-range>
+    // If there's content but the version range part is effectively empty or
+    // uses a constraint like `<0` that excludes everything, treat as deprecated.
+    for line in trimmed.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with("--") {
+            continue;
+        }
+        // Split into package name and version range.
+        if let Some((_pkg, range)) = line.split_once(' ') {
+            let range = range.trim();
+            if !range.is_empty() {
+                // There is a non-empty version range = not deprecated.
+                return false;
+            }
+        }
+        // A line with just a package name and no range = deprecated.
+    }
+
+    true
 }
 
 /// Extract the `synopsis` field from a `.cabal` file's raw text.
