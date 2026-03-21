@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<svg xmlns="http://www.w3.org/2000/svg" width="600" height="200" viewBox="0 0 600 200">
+<svg xmlns="http://www.w3.org/2000/svg" width="660" height="200" viewBox="0 0 660 200">
   <defs>
     <!-- Glow filter for the eye icon -->
     <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
@@ -16,10 +16,10 @@
   </defs>
 
   <!-- Background -->
-  <rect width="600" height="200" fill="#1a1a2e" rx="12"/>
+  <rect width="660" height="200" fill="#1a1a2e" rx="12"/>
 
-  <!-- Eye icon (scaled down from 1024 to fit ~140px, centered vertically) -->
-  <g transform="translate(30, 12) scale(0.172)">
+  <!-- Eye icon (scaled down, left side) -->
+  <g transform="translate(24, 16) scale(0.164)">
     <path fill="#2d2d3a" transform="scale(2 2)" d="M86.2101 363.134C84.4298 358.991 81.1973 354.504 79.0754 350.46C31.0523 258.937 58.007 147.169 144.422 89.0631C198.726 52.5488 266.975 45.1719 328.231 68.7902C440.757 112.176 488.745 243.756 433.862 349.744C431.89 353.592 428.681 357.902 427.166 361.816L427.005 362.237C425.372 373.878 421.89 382.707 408.508 384.532C400.605 397.963 374.292 418.231 361.731 426.213C284.649 475.197 177.487 462.717 113.686 396.986C110.428 393.625 105.112 388.524 102.873 384.532C91.8205 380.451 88.8827 374.198 86.2101 363.134Z"/>
     <path fill="#FE8E8D" opacity="0.9" transform="scale(2 2)" d="M86.2101 363.134C84.4298 358.991 81.1973 354.504 79.0754 350.46C31.0523 258.937 58.007 147.169 144.422 89.0631C198.726 52.5488 266.975 45.1719 328.231 68.7902C440.757 112.176 488.745 243.756 433.862 349.744C431.89 353.592 428.681 357.902 427.166 361.816L427.005 362.237C422.658 348.927 416.095 341.988 410.371 330.276L275.305 86.1533C269.114 78.3508 267.383 66.79 251.495 70.7065C243.139 72.7662 241.205 79.3438 237.228 86.1533L114.71 307.013C110.925 313.694 106.76 321.647 102.873 328.089C96.4228 341.705 89.6388 347.394 86.2101 363.134Z"/>
     <path fill="#FFCBBE" opacity="0.9" transform="scale(2 2)" d="M275.305 86.1533C278.486 86.024 289.406 88.0814 292.818 88.8049C392.357 109.91 452.375 218.384 416.927 314.701C415.126 319.593 412.884 325.755 410.371 330.276L275.305 86.1533Z"/>
@@ -35,9 +35,9 @@
     <path fill="#5BCAF9" opacity="0.8" transform="scale(2 2)" d="M240.124 118.049C242.743 118.01 246.377 120.001 245.074 122.725C240.161 132.988 234.167 143.002 228.626 152.924L193.281 216.81C192.033 219.072 184.606 234.035 183.476 234.628L182.893 234.373C180.859 233.115 179.073 231.976 176.909 230.931C187.222 208.96 202.315 184.383 214.28 163.091L237.771 120.257C238.368 119.181 239.064 118.628 240.124 118.049Z"/>
   </g>
 
-  <!-- "CABALIST" text -->
+  <!-- "CABALIST" text — shifted right for clearance from icon -->
   <text
-    x="380"
+    x="410"
     y="108"
     font-family="'SF Pro Display', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
     font-size="62"
@@ -51,7 +51,7 @@
 
   <!-- Tagline -->
   <text
-    x="380"
+    x="410"
     y="142"
     font-family="'SF Pro Text', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
     font-size="16"
@@ -62,14 +62,14 @@
   >OPINIONATED .CABAL MANAGEMENT</text>
 
   <!-- Thin accent line -->
-  <line x1="240" y1="155" x2="520" y2="155" stroke="#00B8EF" stroke-width="1" opacity="0.4"/>
+  <line x1="260" y1="155" x2="560" y2="155" stroke="#00B8EF" stroke-width="1" opacity="0.4"/>
 
   <!-- Three tool badges -->
   <g font-family="'SF Mono', 'Cascadia Code', 'Fira Code', monospace" font-size="11" letter-spacing="1">
-    <text x="300" y="177" fill="#5BCAF9" text-anchor="middle" opacity="0.7">TUI</text>
-    <text x="340" y="177" fill="#555" text-anchor="middle">|</text>
-    <text x="380" y="177" fill="#5BCAF9" text-anchor="middle" opacity="0.7">CLI</text>
-    <text x="420" y="177" fill="#555" text-anchor="middle">|</text>
-    <text x="460" y="177" fill="#5BCAF9" text-anchor="middle" opacity="0.7">LSP</text>
+    <text x="350" y="177" fill="#5BCAF9" text-anchor="middle" opacity="0.7">TUI</text>
+    <text x="390" y="177" fill="#555" text-anchor="middle">|</text>
+    <text x="430" y="177" fill="#5BCAF9" text-anchor="middle" opacity="0.7">CLI</text>
+    <text x="470" y="177" fill="#555" text-anchor="middle">|</text>
+    <text x="510" y="177" fill="#5BCAF9" text-anchor="middle" opacity="0.7">LSP</text>
   </g>
 </svg>
