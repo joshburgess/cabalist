@@ -38,7 +38,7 @@
   <!-- "CABALIST" text — shifted right for clearance from icon -->
   <text
     x="410"
-    y="108"
+    y="82"
     font-family="'SF Pro Display', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
     font-size="62"
     font-weight="700"
@@ -52,7 +52,7 @@
   <!-- Tagline -->
   <text
     x="410"
-    y="142"
+    y="116"
     font-family="'SF Pro Text', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
     font-size="16"
     font-weight="400"
@@ -62,14 +62,14 @@
   >OPINIONATED .CABAL MANAGEMENT</text>
 
   <!-- Thin accent line -->
-  <line x1="260" y1="155" x2="560" y2="155" stroke="#00B8EF" stroke-width="1" opacity="0.4"/>
+  <line x1="260" y1="129" x2="560" y2="129" stroke="#00B8EF" stroke-width="1" opacity="0.4"/>
 
   <!-- Three tool badges -->
   <g font-family="'SF Mono', 'Cascadia Code', 'Fira Code', monospace" font-size="11" letter-spacing="1">
-    <text x="350" y="177" fill="#5BCAF9" text-anchor="middle" opacity="0.7">TUI</text>
-    <text x="390" y="177" fill="#555" text-anchor="middle">|</text>
-    <text x="430" y="177" fill="#5BCAF9" text-anchor="middle" opacity="0.7">CLI</text>
-    <text x="470" y="177" fill="#555" text-anchor="middle">|</text>
-    <text x="510" y="177" fill="#5BCAF9" text-anchor="middle" opacity="0.7">LSP</text>
+    <text x="350" y="151" fill="#5BCAF9" text-anchor="middle" opacity="0.7">TUI</text>
+    <text x="390" y="151" fill="#555" text-anchor="middle">|</text>
+    <text x="430" y="151" fill="#5BCAF9" text-anchor="middle" opacity="0.7">CLI</text>
+    <text x="470" y="151" fill="#555" text-anchor="middle">|</text>
+    <text x="510" y="151" fill="#5BCAF9" text-anchor="middle" opacity="0.7">LSP</text>
   </g>
 </svg>
