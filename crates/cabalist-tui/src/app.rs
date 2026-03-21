@@ -204,6 +204,8 @@ pub struct App {
     pub dirty: bool,
     /// Whether the app should exit the event loop.
     pub should_quit: bool,
+    /// Whether a quit confirmation dialog is showing.
+    pub confirm_quit: bool,
     /// A transient status message and the time it was set.
     pub status_message: Option<(String, Instant)>,
     /// Search query text (shared across search popups).
@@ -296,6 +298,7 @@ impl App {
             current_view: View::Dashboard,
             dirty: false,
             should_quit: false,
+            confirm_quit: false,
             status_message: None,
             search_query: String::new(),
             search_active: false,
@@ -361,6 +364,7 @@ impl App {
             current_view: View::Init,
             dirty: false,
             should_quit: false,
+            confirm_quit: false,
             status_message: None,
             search_query: String::new(),
             search_active: false,
@@ -921,21 +925,32 @@ impl App {
         Ok(())
     }
 
-    /// Toggle an extension in the library's default-extensions field.
+    /// Toggle an extension in the selected component's default-extensions field.
     pub fn toggle_extension(&mut self, ext_name: &str) -> Result<(), String> {
-        // For extensions, we operate on the library (or first component).
-        let cst = &self.parse_result.cst;
+        let (keyword, name) = self
+            .selected_component_spec()
+            .ok_or_else(|| "No component selected".to_string())?;
+        let keyword = keyword.to_string();
+        let name = name.map(|n| n.to_string());
 
-        // Determine which section to modify. If there's a library, use it.
-        let section_id = edit::find_section(cst, "library", None)
-            .ok_or_else(|| "No library component found".to_string())?;
+        let cst = &self.parse_result.cst;
+        let section_id = edit::find_section(cst, &keyword, name.as_deref())
+            .ok_or_else(|| format!("Component '{keyword}' not found"))?;
 
         let ast = self.ast();
         let is_enabled = ast
-            .library
-            .as_ref()
-            .map(|lib| {
-                lib.fields
+            .all_components()
+            .iter()
+            .find(|c| {
+                let f = c.fields();
+                match (keyword.as_str(), name.as_deref()) {
+                    ("library", _) => matches!(c, ast::Component::Library(_)),
+                    (_, Some(n)) => f.name == Some(n),
+                    _ => false,
+                }
+            })
+            .map(|c| {
+                c.fields()
                     .default_extensions
                     .iter()
                     .any(|e| e.eq_ignore_ascii_case(ext_name))

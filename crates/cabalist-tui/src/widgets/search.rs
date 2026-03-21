@@ -75,7 +75,11 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     if is_deps_view {
         if app.hackage_index.is_none() {
             text.push(Line::from(Span::styled(
-                "  (Hackage index not available)",
+                "  Hackage index not available.",
+                theme.warning_style(),
+            )));
+            text.push(Line::from(Span::styled(
+                "  Press Ctrl+U to download it, or run: cabalist-cli update-index",
                 theme.muted_style(),
             )));
         } else if app.search_query.len() < 2 {

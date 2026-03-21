@@ -222,8 +222,12 @@ fn render_health(frame: &mut Frame, app: &App, area: Rect) {
     let n_unlisted = app.count_unlisted_modules();
 
     let mut summary = format!("  {n_errors} errors, {n_warnings} warnings, {n_info} suggestions");
-    if n_outdated > 0 {
-        summary.push_str(&format!(", {n_outdated} outdated deps"));
+    if app.hackage_index.is_some() {
+        if n_outdated > 0 {
+            summary.push_str(&format!(", {n_outdated} outdated deps"));
+        }
+    } else {
+        summary.push_str(" (Ctrl+U to check outdated)");
     }
     if n_unlisted > 0 {
         summary.push_str(&format!(", {n_unlisted} unlisted modules"));

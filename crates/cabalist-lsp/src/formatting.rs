@@ -11,9 +11,12 @@ use crate::convert::LineIndex;
 /// the original source into the formatted version.
 ///
 /// Returns an empty vec if no changes are needed (already formatted).
-pub fn format_document(source: &str, line_index: &LineIndex) -> Vec<TextEdit> {
-    let project_root = std::env::current_dir().unwrap_or_default();
-    let config = cabalist_opinions::config::find_and_load_config(&project_root);
+pub fn format_document(
+    source: &str,
+    line_index: &LineIndex,
+    project_root: &std::path::Path,
+) -> Vec<TextEdit> {
+    let config = cabalist_opinions::config::find_and_load_config(project_root);
 
     let mut current = source.to_string();
 
@@ -58,7 +61,7 @@ mod tests {
     fn format_already_clean() {
         let source = "cabal-version: 3.0\nname: test\nversion: 0.1\n";
         let line_index = LineIndex::new(source);
-        let edits = format_document(source, &line_index);
+        let edits = format_document(source, &line_index, std::path::Path::new("."));
         assert!(edits.is_empty(), "clean file should produce no edits");
     }
 
@@ -66,7 +69,7 @@ mod tests {
     fn format_produces_valid_range() {
         let source = "cabal-version: 3.0\nname:    test\nversion: 0.1\n";
         let line_index = LineIndex::new(source);
-        let edits = format_document(source, &line_index);
+        let edits = format_document(source, &line_index, std::path::Path::new("."));
         // Even if no format changes (round-trip is clean), edits should be valid.
         for edit in &edits {
             assert!(edit.range.start.line <= edit.range.end.line);

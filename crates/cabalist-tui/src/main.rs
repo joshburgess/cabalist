@@ -191,10 +191,20 @@ fn render(frame: &mut ratatui::Frame, app: &App) {
 
 /// Apply an action to the app state.
 fn handle_action(app: &mut App, action: Action) {
+    // Reset quit confirmation if user does anything other than quit.
+    if !matches!(action, Action::Quit | Action::None) {
+        app.confirm_quit = false;
+    }
+
     match action {
         Action::None => {}
         Action::Quit => {
-            app.should_quit = true;
+            if app.dirty && !app.confirm_quit {
+                app.confirm_quit = true;
+                app.set_status("Unsaved changes! Press q again to discard, Ctrl+S to save first");
+            } else {
+                app.should_quit = true;
+            }
         }
         Action::SwitchView(view) => {
             app.current_view = view;

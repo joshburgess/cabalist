@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -125,6 +125,12 @@ enum Command {
     Clean,
     /// Download or update the Hackage package index
     UpdateIndex,
+    /// Generate shell completions
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
 }
 
 #[derive(Clone, Copy, clap::ValueEnum)]
@@ -167,6 +173,11 @@ fn main() -> ExitCode {
         Command::Test => commands::build::run_test(&cli.file),
         Command::Clean => commands::build::run_clean(&cli.file),
         Command::UpdateIndex => commands::update_index::run(),
+        Command::Completions { shell } => {
+            let mut cmd = Cli::command();
+            clap_complete::generate(shell, &mut cmd, "cabalist-cli", &mut std::io::stdout());
+            Ok(ExitCode::SUCCESS)
+        }
     };
 
     match result {

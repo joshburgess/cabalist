@@ -360,7 +360,8 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
 
-        let edits = crate::formatting::format_document(&doc.source, &doc.line_index);
+        let project_root = Self::project_root(&uri);
+        let edits = crate::formatting::format_document(&doc.source, &doc.line_index, &project_root);
         if edits.is_empty() {
             Ok(None)
         } else {
