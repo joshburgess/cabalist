@@ -1,7 +1,11 @@
-# Cabalist
+<p align="center">
+  <img src="logo.svg" alt="Cabalist" width="600"/>
+</p>
 
-[![CI](https://github.com/joshburgess/cabalist/actions/workflows/ci.yml/badge.svg)](https://github.com/joshburgess/cabalist/actions/workflows/ci.yml)
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
+<p align="center">
+  <a href="https://github.com/joshburgess/cabalist/actions/workflows/ci.yml"><img src="https://github.com/joshburgess/cabalist/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg" alt="License: MIT OR Apache-2.0"></a>
+</p>
 
 **Cabalist** is a strongly opinionated toolkit for managing Haskell `.cabal` files. It provides an interactive TUI, a scriptable CLI, and an LSP server for editor integration — all backed by a parser with byte-identical round-trip fidelity.
 
