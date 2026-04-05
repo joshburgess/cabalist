@@ -134,6 +134,12 @@ enum Command {
         #[arg(value_enum)]
         shell: clap_complete::Shell,
     },
+    /// Generate man pages
+    Manpages {
+        /// Output directory
+        #[arg(default_value = "man")]
+        dir: PathBuf,
+    },
 }
 
 #[derive(Clone, Copy, clap::ValueEnum)]
@@ -187,6 +193,15 @@ fn main() -> ExitCode {
             clap_complete::generate(shell, &mut cmd, "cabalist-cli", &mut std::io::stdout());
             Ok(ExitCode::SUCCESS)
         }
+        Command::Manpages { dir } => (|| {
+            std::fs::create_dir_all(&dir)
+                .map_err(|e| anyhow::anyhow!("failed to create directory: {e}"))?;
+            let cmd = Cli::command();
+            clap_mangen::generate_to(cmd, &dir)
+                .map_err(|e| anyhow::anyhow!("failed to generate man pages: {e}"))?;
+            eprintln!("Man pages written to {}", dir.display());
+            Ok(ExitCode::SUCCESS)
+        })()
     };
 
     match result {

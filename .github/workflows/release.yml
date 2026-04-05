@@ -60,12 +60,23 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
+      - name: Generate shell completions and man pages
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p completions man
+          for shell in bash zsh fish; do
+            cargo run --release --target ${{ matrix.target }} --bin cabalist-cli -- completions "$shell" > "completions/cabalist-cli.$shell"
+          done
+          cargo run --release --target ${{ matrix.target }} --bin cabalist-cli -- manpages man
+
       - name: Package (Unix)
         if: runner.os != 'Windows'
         run: |
           mkdir -p dist
           cp target/${{ matrix.target }}/release/cabalist dist/ || true
           cp target/${{ matrix.target }}/release/cabalist-cli dist/ || true
+          cp -r completions dist/
+          cp -r man dist/
           cd dist
           tar czf ../cabalist-${{ github.ref_name }}-${{ matrix.target }}.tar.gz *
 
