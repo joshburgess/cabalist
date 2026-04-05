@@ -90,6 +90,8 @@ pub struct TemplateVars {
     pub language: String,
     /// Exposed modules for the library component.
     pub exposed_modules: String,
+    /// Base library version bound (e.g. `"4.20"`).
+    pub base_version: String,
 }
 
 impl Default for TemplateVars {
@@ -106,6 +108,7 @@ impl Default for TemplateVars {
             repo_url: "https://github.com/user/my-project".to_string(),
             language: crate::defaults::DEFAULT_LANGUAGE.to_string(),
             exposed_modules: "MyLib".to_string(),
+            base_version: "4.20".to_string(),
         }
     }
 }
@@ -148,6 +151,7 @@ fn substitute(template: &str, vars: &TemplateVars) -> String {
         .replace("{{repo-url}}", &vars.repo_url)
         .replace("{{language}}", &vars.language)
         .replace("{{exposed-modules}}", &vars.exposed_modules)
+        .replace("{{base-version}}", &vars.base_version)
 }
 
 #[cfg(test)]

@@ -39,12 +39,18 @@ pub fn run(
         ProjectType::Full => TemplateKind::Full,
     };
 
-    // Detect GHC version to choose the appropriate default language.
-    let language = cabalist_ghc::versions::detect_ghc_version()
+    // Detect GHC version to choose the appropriate default language and base version.
+    let ghc_version = cabalist_ghc::versions::detect_ghc_version();
+    let language = ghc_version
         .as_deref()
         .map(cabalist_opinions::defaults::language_for_ghc_version)
         .unwrap_or(cabalist_opinions::DEFAULT_LANGUAGE)
         .to_string();
+
+    let base_version = ghc_version
+        .as_deref()
+        .and_then(detect_base_major_version)
+        .unwrap_or_else(|| "4.20".to_string());
 
     // Build template variables.
     let vars = TemplateVars {
@@ -53,6 +59,7 @@ pub fn run(
         author,
         maintainer,
         language,
+        base_version,
         ..Default::default()
     };
 
@@ -168,6 +175,43 @@ fn create_project_dirs(root: &Path, name: &str, kind: TemplateKind) -> Result<()
 
     let _ = name;
     Ok(())
+}
+
+/// Detect the major `base` library version (e.g., "4.20") for the installed GHC.
+///
+/// Tries an exact lookup first, then searches for the closest known GHC version.
+fn detect_base_major_version(ghc_version: &str) -> Option<String> {
+    // Try exact match first.
+    if let Some(base) = cabalist_ghc::versions::base_version_for_ghc(ghc_version) {
+        let parts: Vec<&str> = base.split('.').collect();
+        if parts.len() >= 2 {
+            return Some(format!("{}.{}", parts[0], parts[1]));
+        }
+    }
+
+    // Find the closest known GHC version that's <= the installed one.
+    let map = cabalist_ghc::versions::ghc_base_map();
+    let mut best: Option<&cabalist_ghc::GhcBaseMapping> = None;
+    for entry in map {
+        if cabalist_ghc::versions::version_gte(ghc_version, entry.ghc) {
+            match best {
+                Some(prev) if cabalist_ghc::versions::version_gte(entry.ghc, prev.ghc) => {
+                    best = Some(entry);
+                }
+                None => best = Some(entry),
+                _ => {}
+            }
+        }
+    }
+
+    best.map(|entry| {
+        let parts: Vec<&str> = entry.base.split('.').collect();
+        if parts.len() >= 2 {
+            format!("{}.{}", parts[0], parts[1])
+        } else {
+            entry.base.to_string()
+        }
+    })
 }
 
 /// Detect author name and email from git config.

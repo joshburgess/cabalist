@@ -829,6 +829,27 @@ impl App {
                 .unwrap_or(cabalist_opinions::DEFAULT_LANGUAGE)
                 .to_string(),
             exposed_modules: module_name.clone(),
+            base_version: self
+                .ghc_version
+                .as_deref()
+                .and_then(|v| {
+                    let map = cabalist_ghc::versions::ghc_base_map();
+                    let mut best: Option<&cabalist_ghc::GhcBaseMapping> = None;
+                    for entry in map {
+                        if cabalist_ghc::versions::version_gte(v, entry.ghc) {
+                            match best {
+                                Some(prev) if cabalist_ghc::versions::version_gte(entry.ghc, prev.ghc) => best = Some(entry),
+                                None => best = Some(entry),
+                                _ => {}
+                            }
+                        }
+                    }
+                    best.map(|e| {
+                        let parts: Vec<&str> = e.base.split('.').collect();
+                        if parts.len() >= 2 { format!("{}.{}", parts[0], parts[1]) } else { e.base.to_string() }
+                    })
+                })
+                .unwrap_or_else(|| "4.20".to_string()),
         };
 
         let template_kind = wizard.template;

@@ -33,7 +33,7 @@ library
     import:           warnings
     exposed-modules:  {{exposed-modules}}
     build-depends:
-        base ^>=4.17
+        base ^>={{base-version}}
     hs-source-dirs:   src
     default-language: {{language}}
     default-extensions:
@@ -44,7 +44,7 @@ executable {{name}}
     import:           warnings
     main-is:          Main.hs
     build-depends:
-        base ^>=4.17
+        base ^>={{base-version}}
       , {{name}}
     hs-source-dirs:   app
     default-language: {{language}}
@@ -57,7 +57,7 @@ test-suite {{name}}-tests
     type:             exitcode-stdio-1.0
     main-is:          Main.hs
     build-depends:
-        base ^>=4.17
+        base ^>={{base-version}}
       , {{name}}
       , tasty        ^>=1.5
       , tasty-hunit  ^>=0.10
@@ -72,7 +72,7 @@ benchmark {{name}}-bench
     type:             exitcode-stdio-1.0
     main-is:          Main.hs
     build-depends:
-        base ^>=4.17
+        base ^>={{base-version}}
       , {{name}}
       , tasty-bench ^>=0.3
     hs-source-dirs:   bench
