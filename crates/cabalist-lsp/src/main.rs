@@ -5,7 +5,6 @@
 
 mod actions;
 mod completions;
-mod convert;
 mod definition;
 mod diagnostics;
 mod formatting;
@@ -14,8 +13,9 @@ mod inlay_hints;
 mod rename;
 mod semantic_tokens;
 mod server;
-mod state;
 mod symbols;
+
+use cabalist_lsp::{convert, state};
 
 use tower_lsp::{LspService, Server};
 
