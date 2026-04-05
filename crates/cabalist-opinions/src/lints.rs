@@ -217,8 +217,12 @@ fn lint_missing_upper_bound(file: &CabalFile<'_>, config: &LintConfig, lints: &m
         return;
     }
     let severity = config.effective_severity(ID, Severity::Warning);
+    let pkg_name = file.name.unwrap_or("");
 
     for dep in file.all_dependencies() {
+        if dep.package == pkg_name {
+            continue;
+        }
         match &dep.version_range {
             None => {
                 // No version range at all — that's covered by wide-any-version
@@ -251,8 +255,12 @@ fn lint_missing_lower_bound(file: &CabalFile<'_>, config: &LintConfig, lints: &m
         return;
     }
     let severity = config.effective_severity(ID, Severity::Warning);
+    let pkg_name = file.name.unwrap_or("");
 
     for dep in file.all_dependencies() {
+        if dep.package == pkg_name {
+            continue;
+        }
         match &dep.version_range {
             None => {
                 // No version range at all — covered by wide-any-version
@@ -285,7 +293,14 @@ fn lint_wide_any_version(file: &CabalFile<'_>, config: &LintConfig, lints: &mut 
     }
     let severity = config.effective_severity(ID, Severity::Warning);
 
+    let pkg_name = file.name.unwrap_or("");
+
     for dep in file.all_dependencies() {
+        // Internal (self) dependencies don't need version bounds.
+        if dep.package == pkg_name {
+            continue;
+        }
+
         let fires = match &dep.version_range {
             None => true,
             Some(vr) => is_wide_any(vr),
@@ -1096,6 +1111,43 @@ library
 ";
         let lints = parse_and_lint(source);
         assert!(lint_ids(&lints).contains(&"wide-any-version"));
+    }
+
+    #[test]
+    fn self_dependency_skipped_by_version_lints() {
+        let source = "\
+cabal-version: 3.0
+name: my-lib
+version: 0.1.0.0
+
+library
+  build-depends: base ^>=4.17
+  exposed-modules: MyLib
+  default-language: GHC2021
+
+executable my-exe
+  main-is: Main.hs
+  build-depends: base ^>=4.17, my-lib
+  default-language: GHC2021
+
+test-suite my-tests
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  build-depends: base ^>=4.17, my-lib
+  default-language: GHC2021
+";
+        let lints = parse_and_lint(source);
+        let ids = lint_ids(&lints);
+        // Self-deps should not trigger any version bound lints.
+        for lint in &lints {
+            if lint.message.contains("'my-lib'") {
+                panic!(
+                    "Self-dependency 'my-lib' should not trigger lint '{}': {}",
+                    lint.id, lint.message
+                );
+            }
+        }
+        assert!(!ids.contains(&"wide-any-version") || !lints.iter().any(|l| l.message.contains("my-lib")));
     }
 
     #[test]
