@@ -74,23 +74,23 @@ Use `d` for dependencies, `e` for extensions, `b` for build, `m` for metadata, `
 
 ### CLI
 
-```sh
-cabalist-cli check                         # Lint your .cabal file
-cabalist-cli add aeson                     # Add a dependency with PVP bounds
-cabalist-cli add text --version "^>=2.0"   # Add with specific version constraint
-cabalist-cli remove old-package            # Remove a dependency
-cabalist-cli extensions --toggle DerivingStrategies  # Toggle an extension
-cabalist-cli set synopsis "My cool library"          # Set a metadata field
-cabalist-cli fmt                           # Format the .cabal file
-cabalist-cli deps --outdated               # Check for outdated dependencies
-cabalist-cli deps --tree                   # Show dependency tree
-cabalist-cli modules --scan                # Find .hs files not listed in .cabal
-cabalist-cli build                         # Run cabal build
-cabalist-cli test                          # Run cabal test
-cabalist-cli info                          # Show project summary
-cabalist-cli init --type full              # Create a new project
-cabalist-cli update-index                  # Download/refresh Hackage index
-```
+| Command | Description |
+|---------|-------------|
+| `cabalist-cli check` | Lint your `.cabal` file |
+| `cabalist-cli add aeson` | Add a dependency with PVP bounds |
+| `cabalist-cli add text --version "^>=2.0"` | Add with specific version constraint |
+| `cabalist-cli remove old-package` | Remove a dependency |
+| `cabalist-cli extensions --toggle DerivingStrategies` | Toggle an extension |
+| `cabalist-cli set synopsis "My cool library"` | Set a metadata field |
+| `cabalist-cli fmt` | Format the `.cabal` file |
+| `cabalist-cli deps --outdated` | Check for outdated dependencies |
+| `cabalist-cli deps --tree` | Show dependency tree |
+| `cabalist-cli modules --scan` | Find `.hs` files not listed in `.cabal` |
+| `cabalist-cli build` | Run `cabal build` |
+| `cabalist-cli test` | Run `cabal test` |
+| `cabalist-cli info` | Show project summary |
+| `cabalist-cli init --type full` | Create a new project |
+| `cabalist-cli update-index` | Download/refresh Hackage index |
 
 ### Editor (LSP)
 
