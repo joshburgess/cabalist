@@ -113,7 +113,7 @@ pub fn compute_diagnostics(
     let ast = cabalist_parser::ast::derive_ast(&result.cst);
     let config = cabalist_opinions::config::find_and_load_config(project_root);
     let lint_config = config.lints.to_lint_config();
-    let lints = cabalist_opinions::run_all_lints(&ast, &lint_config, project_root);
+    let lints = cabalist_opinions::run_all_lints_with_cst(&ast, Some(&result.cst), &lint_config, project_root);
     for lint in &lints {
         lsp_diags.push(lint_to_lsp(lint, line_index));
     }

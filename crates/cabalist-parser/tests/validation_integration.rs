@@ -80,11 +80,30 @@ version: 0.1.0.0
 
 library
   exposed-modules: Foo
+  default-language: Haskell2010
+  default-language: GHC2021
+";
+    let diags = validate_source(src);
+    assert!(has_diagnostic(&diags, "duplicate field: `default-language`"));
+}
+
+#[test]
+fn validation_repeatable_field_not_flagged() {
+    let src = "\
+cabal-version: 3.0
+name: foo
+version: 0.1.0.0
+
+library
+  exposed-modules: Foo
   build-depends: base
   build-depends: text
 ";
     let diags = validate_source(src);
-    assert!(has_diagnostic(&diags, "duplicate field: `build-depends`"));
+    assert!(
+        !has_diagnostic(&diags, "duplicate field"),
+        "build-depends should be allowed multiple times: {diags:?}"
+    );
 }
 
 #[test]
@@ -102,11 +121,11 @@ version: 0.1.0.0
 
 library
   exposed-modules: Foo
-  build-depends: base
-  build_depends: text
+  default-language: Haskell2010
+  default_language: GHC2021
 ";
     let diags = validate_source(src);
-    assert!(has_diagnostic(&diags, "duplicate field: `build-depends`"));
+    assert!(has_diagnostic(&diags, "duplicate field: `default-language`"));
 }
 
 // ============================================================================
@@ -357,8 +376,8 @@ name: foo
 version: 0.1.0.0
 
 library
-  build-depends: base
-  build-depends: text
+  default-language: Haskell2010
+  default-language: GHC2021
 
 executable bar
   main-is: Main.hs
@@ -373,7 +392,7 @@ executable bar
         "missing required field: `cabal-version`"
     ));
     // Duplicate field in library.
-    assert!(has_diagnostic(&diags, "duplicate field: `build-depends`"));
+    assert!(has_diagnostic(&diags, "duplicate field: `default-language`"));
     // Duplicate section.
     assert!(has_diagnostic(
         &diags,

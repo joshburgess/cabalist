@@ -27,7 +27,7 @@ pub fn run(file: &Option<PathBuf>, strict: bool, format: OutputFormat) -> Result
 
     // Derive AST and run opinionated lints (including filesystem-aware lints).
     let ast = derive_ast(&result.cst);
-    let lints = cabalist_opinions::run_all_lints(&ast, &lint_config, project_root);
+    let lints = cabalist_opinions::run_all_lints_with_cst(&ast, Some(&result.cst), &lint_config, project_root);
 
     match format {
         OutputFormat::Json => print_json_output(&cabal_path, &source, &validation_diags, &lints),

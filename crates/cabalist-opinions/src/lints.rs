@@ -5,8 +5,9 @@
 //! users can disable specific lints in `cabalist.toml`.
 
 use cabalist_parser::ast::{CabalFile, ComponentFields, Condition, Conditional, VersionRange};
+use cabalist_parser::cst::CabalCst;
 use cabalist_parser::diagnostic::Severity;
-use cabalist_parser::span::Span;
+use cabalist_parser::span::{NodeId, Span};
 
 // ---------------------------------------------------------------------------
 // Lint result type
@@ -66,29 +67,36 @@ impl LintConfig {
 ///
 /// Returns a vector of lint findings sorted by source position.
 pub fn run_lints(file: &CabalFile<'_>, config: &LintConfig) -> Vec<Lint> {
+    run_lints_with_cst(file, None, config)
+}
+
+/// Run all lints with optional CST for accurate source spans.
+///
+/// When `cst` is provided, lint spans point to the actual source location.
+/// Without it, spans default to `0:0` (the file start).
+pub fn run_lints_with_cst(
+    file: &CabalFile<'_>,
+    cst: Option<&CabalCst>,
+    config: &LintConfig,
+) -> Vec<Lint> {
     let mut lints = Vec::new();
+    let resolve = |node: NodeId| resolve_span(cst, node);
 
-    let all_linters: &[fn(&CabalFile<'_>, &LintConfig, &mut Vec<Lint>)] = &[
-        lint_missing_upper_bound,
-        lint_missing_lower_bound,
-        lint_wide_any_version,
-        lint_missing_synopsis,
-        lint_missing_description,
-        lint_missing_source_repo,
-        lint_missing_bug_reports,
-        lint_no_common_stanza,
-        lint_ghc_options_werror,
-        lint_missing_default_language,
-        lint_exposed_no_modules,
-        lint_cabal_version_low,
-        lint_duplicate_dep,
-        lint_unused_flag,
-        lint_stale_tested_with,
-    ];
-
-    for linter in all_linters {
-        linter(file, config, &mut lints);
-    }
+    lint_missing_upper_bound(file, config, &resolve, &mut lints);
+    lint_missing_lower_bound(file, config, &resolve, &mut lints);
+    lint_wide_any_version(file, config, &resolve, &mut lints);
+    lint_missing_synopsis(file, config, &mut lints);
+    lint_missing_description(file, config, &mut lints);
+    lint_missing_source_repo(file, config, &mut lints);
+    lint_missing_bug_reports(file, config, &mut lints);
+    lint_no_common_stanza(file, config, &resolve, &mut lints);
+    lint_ghc_options_werror(file, config, &resolve, &mut lints);
+    lint_missing_default_language(file, config, &resolve, &mut lints);
+    lint_exposed_no_modules(file, config, &resolve, &mut lints);
+    lint_cabal_version_low(file, config, &resolve, &mut lints);
+    lint_duplicate_dep(file, config, &resolve, &mut lints);
+    lint_unused_flag(file, config, &resolve, &mut lints);
+    lint_stale_tested_with(file, config, &resolve, &mut lints);
 
     lints.sort_by_key(|l| l.span.start);
     lints
@@ -104,8 +112,19 @@ pub fn run_fs_lints(
     config: &LintConfig,
     project_root: &std::path::Path,
 ) -> Vec<Lint> {
+    run_fs_lints_with_cst(file, None, config, project_root)
+}
+
+/// Run filesystem-aware lints with optional CST for accurate source spans.
+pub fn run_fs_lints_with_cst(
+    file: &CabalFile<'_>,
+    cst: Option<&CabalCst>,
+    config: &LintConfig,
+    project_root: &std::path::Path,
+) -> Vec<Lint> {
     let mut lints = Vec::new();
-    lint_string_gaps(file, config, project_root, &mut lints);
+    let resolve = |node: NodeId| resolve_span(cst, node);
+    lint_string_gaps(file, config, &resolve, project_root, &mut lints);
     lints.sort_by_key(|l| l.span.start);
     lints
 }
@@ -116,8 +135,18 @@ pub fn run_all_lints(
     config: &LintConfig,
     project_root: &std::path::Path,
 ) -> Vec<Lint> {
-    let mut lints = run_lints(file, config);
-    lints.extend(run_fs_lints(file, config, project_root));
+    run_all_lints_with_cst(file, None, config, project_root)
+}
+
+/// Run all lints with optional CST for accurate source spans.
+pub fn run_all_lints_with_cst(
+    file: &CabalFile<'_>,
+    cst: Option<&CabalCst>,
+    config: &LintConfig,
+    project_root: &std::path::Path,
+) -> Vec<Lint> {
+    let mut lints = run_lints_with_cst(file, cst, config);
+    lints.extend(run_fs_lints_with_cst(file, cst, config, project_root));
     lints.sort_by_key(|l| l.span.start);
     lints
 }
@@ -197,13 +226,12 @@ fn collect_flags_from_conditionals<'a>(conditionals: &[Conditional<'a>], flags: 
     }
 }
 
-/// Span helper: get a span from a CST node id, falling back to empty span.
-///
-/// We don't have direct access to the CST here, so we use an empty span as a
-/// fallback. In a full integration the caller would resolve `NodeId` to `Span`
-/// via the CST.
-fn span_for_node(_file: &CabalFile<'_>, _node: cabalist_parser::span::NodeId) -> Span {
-    Span::empty(0)
+/// Resolve a `NodeId` to a source `Span` via the CST, falling back to `0:0`.
+fn resolve_span(cst: Option<&CabalCst>, node: NodeId) -> Span {
+    match cst {
+        Some(cst) => cst.node(node).span,
+        None => Span::empty(0),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +239,7 @@ fn span_for_node(_file: &CabalFile<'_>, _node: cabalist_parser::span::NodeId) ->
 // ---------------------------------------------------------------------------
 
 /// `missing-upper-bound`: Dependency has no upper version bound.
-fn lint_missing_upper_bound(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+fn lint_missing_upper_bound(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
     const ID: &str = "missing-upper-bound";
     if !config.is_enabled(ID) {
         return;
@@ -237,7 +265,7 @@ fn lint_missing_upper_bound(file: &CabalFile<'_>, config: &LintConfig, lints: &m
                              This violates the PVP and may break on future releases.",
                             dep.package, vr
                         ),
-                        span: span_for_node(file, dep.cst_node),
+                        span: resolve(dep.cst_node),
                         suggestion: Some(
                             "Consider using '^>=' for PVP-compliant major bounds".to_string(),
                         ),
@@ -249,7 +277,7 @@ fn lint_missing_upper_bound(file: &CabalFile<'_>, config: &LintConfig, lints: &m
 }
 
 /// `missing-lower-bound`: Dependency has no lower version bound.
-fn lint_missing_lower_bound(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+fn lint_missing_lower_bound(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
     const ID: &str = "missing-lower-bound";
     if !config.is_enabled(ID) {
         return;
@@ -274,7 +302,7 @@ fn lint_missing_lower_bound(file: &CabalFile<'_>, config: &LintConfig, lints: &m
                             "Dependency '{}' has no lower version bound ({}).",
                             dep.package, vr
                         ),
-                        span: span_for_node(file, dep.cst_node),
+                        span: resolve(dep.cst_node),
                         suggestion: Some(
                             "Add a lower bound to ensure a minimum compatible version".to_string(),
                         ),
@@ -286,7 +314,7 @@ fn lint_missing_lower_bound(file: &CabalFile<'_>, config: &LintConfig, lints: &m
 }
 
 /// `wide-any-version`: Dependency uses `>=0` or no constraint at all.
-fn lint_wide_any_version(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+fn lint_wide_any_version(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
     const ID: &str = "wide-any-version";
     if !config.is_enabled(ID) {
         return;
@@ -314,7 +342,7 @@ fn lint_wide_any_version(file: &CabalFile<'_>, config: &LintConfig, lints: &mut 
                      Any version will be accepted, which is fragile.",
                     dep.package
                 ),
-                span: span_for_node(file, dep.cst_node),
+                span: resolve(dep.cst_node),
                 suggestion: Some("Add version bounds, e.g. '^>=X.Y'".to_string()),
             });
         }
@@ -398,7 +426,7 @@ fn lint_missing_bug_reports(file: &CabalFile<'_>, config: &LintConfig, lints: &m
 /// `-Werror` is fine in a conditional block (like `if flag(ci)`) but should
 /// not appear as a top-level option because it breaks downstream builds when
 /// new GHC warnings are added.
-fn lint_ghc_options_werror(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+fn lint_ghc_options_werror(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
     const ID: &str = "ghc-options-werror";
     if !config.is_enabled(ID) {
         return;
@@ -416,7 +444,7 @@ fn lint_ghc_options_werror(file: &CabalFile<'_>, config: &LintConfig, lints: &mu
                         "'-Werror' found in {component_desc}'s ghc-options. \
                          This can break downstream builds when GHC adds new warnings."
                     ),
-                    span: span_for_node(file, fields.cst_node),
+                    span: resolve(fields.cst_node),
                     suggestion: Some(
                         "Move '-Werror' into a conditional, e.g. 'if flag(ci)'".to_string(),
                     ),
@@ -454,7 +482,7 @@ fn lint_ghc_options_werror(file: &CabalFile<'_>, config: &LintConfig, lints: &mu
 }
 
 /// `missing-default-language`: Component has no `default-language`.
-fn lint_missing_default_language(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+fn lint_missing_default_language(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
     const ID: &str = "missing-default-language";
     if !config.is_enabled(ID) {
         return;
@@ -470,7 +498,7 @@ fn lint_missing_default_language(file: &CabalFile<'_>, config: &LintConfig, lint
                     "{desc} has no 'default-language' field. \
                      Cabal will pick one, but it should be explicit."
                 ),
-                span: span_for_node(file, fields.cst_node),
+                span: resolve(fields.cst_node),
                 suggestion: Some("Add 'default-language: GHC2021' or 'Haskell2010'".to_string()),
             });
         }
@@ -498,7 +526,7 @@ fn lint_missing_default_language(file: &CabalFile<'_>, config: &LintConfig, lint
 }
 
 /// `cabal-version-low`: `cabal-version < 3.0` — suggest upgrading.
-fn lint_cabal_version_low(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+fn lint_cabal_version_low(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
     const ID: &str = "cabal-version-low";
     if !config.is_enabled(ID) {
         return;
@@ -519,7 +547,7 @@ fn lint_cabal_version_low(file: &CabalFile<'_>, config: &LintConfig, lints: &mut
                          to unlock common stanzas and imports.",
                         v
                     ),
-                    span: span_for_node(file, cv.cst_node),
+                    span: resolve(cv.cst_node),
                     suggestion: Some("Set 'cabal-version: 3.0'".to_string()),
                 });
             }
@@ -528,7 +556,7 @@ fn lint_cabal_version_low(file: &CabalFile<'_>, config: &LintConfig, lints: &mut
 }
 
 /// `duplicate-dep`: Same package appears in `build-depends` more than once.
-fn lint_duplicate_dep(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+fn lint_duplicate_dep(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
     const ID: &str = "duplicate-dep";
     if !config.is_enabled(ID) {
         return;
@@ -547,7 +575,7 @@ fn lint_duplicate_dep(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec
                         "Duplicate dependency '{}' in {desc}'s build-depends.",
                         dep.package
                     ),
-                    span: span_for_node(file, dep.cst_node),
+                    span: resolve(dep.cst_node),
                     suggestion: Some("Remove the duplicate entry".to_string()),
                 });
             }
@@ -580,7 +608,7 @@ fn lint_duplicate_dep(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec
 }
 
 /// `unused-flag`: A `flag` section exists but is never referenced in conditions.
-fn lint_unused_flag(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+fn lint_unused_flag(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
     const ID: &str = "unused-flag";
     if !config.is_enabled(ID) {
         return;
@@ -632,7 +660,7 @@ fn lint_unused_flag(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<L
                     "Flag '{}' is defined but never referenced in any conditional.",
                     flag.name
                 ),
-                span: span_for_node(file, flag.cst_node),
+                span: resolve(flag.cst_node),
                 suggestion: Some(
                     "Remove the unused flag or add a conditional that uses it".to_string(),
                 ),
@@ -643,7 +671,7 @@ fn lint_unused_flag(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<L
 
 /// `no-common-stanza`: Multiple sections share ≥5 identical field names,
 /// suggesting the common parts should be extracted into a `common` stanza.
-fn lint_no_common_stanza(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+fn lint_no_common_stanza(file: &CabalFile<'_>, config: &LintConfig, _resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
     const ID: &str = "no-common-stanza";
     if !config.is_enabled(ID) {
         return;
@@ -730,7 +758,7 @@ fn lint_no_common_stanza(file: &CabalFile<'_>, config: &LintConfig, lints: &mut 
 }
 
 /// `exposed-no-modules`: Library with empty or missing `exposed-modules`.
-fn lint_exposed_no_modules(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+fn lint_exposed_no_modules(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
     const ID: &str = "exposed-no-modules";
     if !config.is_enabled(ID) {
         return;
@@ -745,7 +773,7 @@ fn lint_exposed_no_modules(file: &CabalFile<'_>, config: &LintConfig, lints: &mu
                 message: "Library has no 'exposed-modules'. \
                           A library must expose at least one module."
                     .to_string(),
-                span: span_for_node(file, lib.fields.cst_node),
+                span: resolve(lib.fields.cst_node),
                 suggestion: Some(
                     "Add 'exposed-modules: MyModule' to the library section".to_string(),
                 ),
@@ -762,7 +790,7 @@ fn lint_exposed_no_modules(file: &CabalFile<'_>, config: &LintConfig, lints: &mu
                     "Library '{name}' has no 'exposed-modules'. \
                      A library must expose at least one module."
                 ),
-                span: span_for_node(file, lib.fields.cst_node),
+                span: resolve(lib.fields.cst_node),
                 suggestion: Some("Add 'exposed-modules' to this library section".to_string()),
             });
         }
@@ -771,7 +799,7 @@ fn lint_exposed_no_modules(file: &CabalFile<'_>, config: &LintConfig, lints: &mu
 
 /// `stale-tested-with`: `tested-with` lists a GHC version more than 2 major
 /// releases old.
-fn lint_stale_tested_with(file: &CabalFile<'_>, config: &LintConfig, lints: &mut Vec<Lint>) {
+fn lint_stale_tested_with(file: &CabalFile<'_>, config: &LintConfig, _resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
     const ID: &str = "stale-tested-with";
     if !config.is_enabled(ID) {
         return;
@@ -852,6 +880,7 @@ fn lint_stale_tested_with(file: &CabalFile<'_>, config: &LintConfig, lints: &mut
 fn lint_string_gaps(
     file: &CabalFile<'_>,
     config: &LintConfig,
+    resolve: &impl Fn(NodeId) -> Span,
     project_root: &std::path::Path,
     lints: &mut Vec<Lint>,
 ) {
@@ -884,7 +913,7 @@ fn lint_string_gaps(
                             "{desc} lists hs-source-dirs entry '{dir}' \
                              which does not exist on disk."
                         ),
-                        span: span_for_node(file, fields.cst_node),
+                        span: resolve(fields.cst_node),
                         suggestion: Some(format!("Create the '{dir}' directory or fix the path")),
                     });
                 }
@@ -912,7 +941,7 @@ fn lint_string_gaps(
                             "{desc} lists module '{module}' but no corresponding \
                              .hs or .lhs file was found in any source directory."
                         ),
-                        span: span_for_node(file, fields.cst_node),
+                        span: resolve(fields.cst_node),
                         suggestion: Some(format!(
                             "Create '{}.hs' or remove '{module}' from the module list",
                             rel_path

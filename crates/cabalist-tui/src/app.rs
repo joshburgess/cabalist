@@ -446,7 +446,7 @@ impl App {
             .cabal_path
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."));
-        self.lints = cabalist_opinions::lints::run_all_lints(&ast, &lint_config, project_root);
+        self.lints = cabalist_opinions::lints::run_all_lints_with_cst(&ast, Some(&self.parse_result.cst), &lint_config, project_root);
     }
 
     /// Set a transient status message.

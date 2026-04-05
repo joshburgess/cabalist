@@ -367,10 +367,46 @@ fn check_duplicate_section_fields(
     }
 }
 
+/// Fields that can legitimately appear multiple times in a section.
+/// These are list-valued fields where cabal merges all occurrences.
+const REPEATABLE_FIELDS: &[&str] = &[
+    "build-depends",
+    "exposed-modules",
+    "other-modules",
+    "default-extensions",
+    "other-extensions",
+    "ghc-options",
+    "ghc-prof-options",
+    "ghc-shared-options",
+    "pkgconfig-depends",
+    "extra-libraries",
+    "extra-lib-dirs",
+    "extra-framework-dirs",
+    "frameworks",
+    "build-tool-depends",
+    "build-tools",
+    "mixins",
+    "hs-source-dirs",
+    "includes",
+    "include-dirs",
+    "c-sources",
+    "cxx-sources",
+    "js-sources",
+    "extra-ghci-libraries",
+    "extra-bundled-libraries",
+    "autogen-modules",
+    "virtual-modules",
+    "reexported-modules",
+    "signatures",
+];
+
 /// Helper: find duplicates in a list of fields and emit warnings.
 fn check_duplicates_in_field_list(fields: &[FieldInfo], diagnostics: &mut Vec<Diagnostic>) {
     let mut seen: HashMap<&str, Span> = HashMap::new();
     for field in fields {
+        if REPEATABLE_FIELDS.contains(&field.canonical_name.as_str()) {
+            continue;
+        }
         if let Some(&first_span) = seen.get(field.canonical_name.as_str()) {
             let _ = first_span; // We point at the duplicate, not the first.
             diagnostics.push(Diagnostic::warning(
@@ -599,11 +635,30 @@ version: 0.1.0.0
 
 library
   exposed-modules: Foo
+  default-language: Haskell2010
+  default-language: GHC2021
+";
+        let diags = validate_source(src);
+        assert!(has_diagnostic(&diags, "duplicate field: `default-language`"));
+    }
+
+    #[test]
+    fn repeatable_field_not_flagged_as_duplicate() {
+        let src = "\
+cabal-version: 3.0
+name: foo
+version: 0.1.0.0
+
+library
+  exposed-modules: Foo
   build-depends: base
   build-depends: text
 ";
         let diags = validate_source(src);
-        assert!(has_diagnostic(&diags, "duplicate field: `build-depends`"));
+        assert!(
+            !has_diagnostic(&diags, "duplicate field"),
+            "build-depends should be allowed multiple times: {diags:?}"
+        );
     }
 
     #[test]
@@ -876,6 +931,7 @@ test-suite tests
 
     #[test]
     fn duplicate_field_underscore_hyphen() {
+        // Use a non-repeatable field to test underscore/hyphen normalization.
         let src = "\
 cabal-version: 3.0
 name: foo
@@ -883,11 +939,11 @@ version: 0.1.0.0
 
 library
   exposed-modules: Foo
-  build-depends: base
-  build_depends: text
+  default-language: Haskell2010
+  default_language: GHC2021
 ";
         let diags = validate_source(src);
-        assert!(has_diagnostic(&diags, "duplicate field: `build-depends`"));
+        assert!(has_diagnostic(&diags, "duplicate field: `default-language`"));
     }
 
     // -- Edge cases ---------------------------------------------------------
