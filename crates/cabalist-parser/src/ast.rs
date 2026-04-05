@@ -1129,15 +1129,33 @@ fn field_full_value(cst: &CabalCst, node_id: NodeId) -> String {
     value
 }
 
-/// Get the first-line value as a borrowed str reference (trimmed).
-/// Returns `None` if there is no field value.
+/// Get the field value as a borrowed str reference (trimmed).
+/// Checks the first line, then falls back to the first continuation line.
+/// Handles fields like `name:\n  hedgehog`.
 fn field_first_line_value(cst: &CabalCst, node_id: NodeId) -> Option<&str> {
     let node = cst.node(node_id);
     let source = cst.source.as_str();
-    node.field_value
-        .as_ref()
-        .map(|span| span.slice(source).trim())
-        .filter(|s| !s.is_empty())
+
+    // Try the first-line value.
+    if let Some(ref val_span) = node.field_value {
+        let v = val_span.slice(source).trim();
+        if !v.is_empty() {
+            return Some(v);
+        }
+    }
+
+    // Fall back to first non-empty continuation line.
+    for &child_id in &node.children {
+        let child = cst.node(child_id);
+        if child.kind == CstNodeKind::ValueLine {
+            let v = child.content_span.slice(source).trim();
+            if !v.is_empty() {
+                return Some(v);
+            }
+        }
+    }
+
+    None
 }
 
 /// Parse a whitespace/newline-separated list from a field value.

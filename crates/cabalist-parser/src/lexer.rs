@@ -375,11 +375,15 @@ fn classify_line(
 
     // Section header?
     if is_section_keyword(word) {
-        // A section keyword followed by either EOL, whitespace, or nothing
-        // (like `library\n`). But NOT followed by `:` — that would be a field
-        // name (unlikely, but defensive).
-        let after_word = skip_hspace(bytes, word_end);
-        if after_word >= content_end || bytes[after_word] != b':' {
+        // A section keyword must be followed by EOL, whitespace + section arg,
+        // or `{`. It must NOT be followed by punctuation like `.` — that
+        // indicates a continuation/description line (e.g., "  library. The...").
+        if word_end >= content_end {
+            // Keyword at EOL (e.g., `library\n`).
+            return LineKind::SectionHeader;
+        }
+        let ch = bytes[word_end];
+        if ch == b' ' || ch == b'\t' || ch == b'{' {
             return LineKind::SectionHeader;
         }
     }

@@ -89,9 +89,6 @@ fn no_unexpected_validation_errors_on_real_world_files() {
                 !d.message.contains("missing required field")
                     && !d.message.contains("`cabal-version` should be the first")
                     && !d.message.contains("duplicate section")
-                    // TODO: parser doesn't handle comma-separated imports
-                    // (e.g., `import: flag-Wall, tests-common`)
-                    && !d.message.contains("import references undefined common stanza")
             })
             .collect();
 
@@ -257,9 +254,6 @@ fn no_error_severity_lints_on_real_world_files() {
         let errors: Vec<_> = lints
             .iter()
             .filter(|l| l.severity == Severity::Error)
-            // TODO: exposed-no-modules lint misparses description text as
-            // library names in some files with unusual formatting.
-            .filter(|l| l.id != "exposed-no-modules")
             .collect();
 
         if !errors.is_empty() {

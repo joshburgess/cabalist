@@ -33,6 +33,10 @@ pub fn sort_list_field(source: &str, field_name: &str) -> String {
             continue;
         }
 
+        // Detect original list style (multiline vs single-line) before editing.
+        let style = edit::detect_list_style(&result.cst, field_id);
+        let use_sort = !matches!(style, edit::ListStyle::SingleLine);
+
         // Remove items in reverse order, re-parsing between each removal.
         for item in items.iter().rev() {
             let Some((re_result, _, re_field)) =
@@ -49,14 +53,14 @@ pub fn sort_list_field(source: &str, field_name: &str) -> String {
             }
         }
 
-        // Re-add items in sorted order.
+        // Re-add items in sorted order, preserving the original layout style.
         for item in &sorted {
             let Some((re_result, _, re_field)) =
                 find_section_field(&current, key, field_name)
             else {
                 break;
             };
-            let edits = edit::add_list_item(&re_result.cst, re_field, item, false);
+            let edits = edit::add_list_item(&re_result.cst, re_field, item, use_sort);
             if !edits.is_empty() {
                 let mut batch = EditBatch::new();
                 batch.add_all(edits);

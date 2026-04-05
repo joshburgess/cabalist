@@ -452,11 +452,17 @@ fn check_import_references(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for (value, val_span, _node_id) in &ctx.imports {
-        if !ctx.common_stanza_names.contains(value.as_str()) {
-            diagnostics.push(Diagnostic::error(
-                *val_span,
-                format!("import references undefined common stanza: `{value}`"),
-            ));
+        // Imports can be comma-separated (e.g., `import: foo, bar`).
+        for stanza_name in value.split(',') {
+            let stanza_name = stanza_name.trim();
+            if !stanza_name.is_empty()
+                && !ctx.common_stanza_names.contains(stanza_name)
+            {
+                diagnostics.push(Diagnostic::error(
+                    *val_span,
+                    format!("import references undefined common stanza: `{stanza_name}`"),
+                ));
+            }
         }
     }
 }
