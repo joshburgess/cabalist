@@ -4,11 +4,17 @@
 //! into structured data. Handles build invocation, dry-run solver plan parsing,
 //! GHC diagnostic extraction, and `cabal`/`ghc` version detection.
 
+/// Build, test, clean, and run operations via `cabal`.
 pub mod build;
+/// `cabal` and `ghc` toolchain version detection.
 pub mod detect;
+/// GHC diagnostic output parsing.
 pub mod diagnostics;
+/// Error types for cabal subprocess operations.
 pub mod error;
+/// Low-level subprocess invocation and output streaming.
 pub mod invoke;
+/// Solver plan (`plan.json`) parsing.
 pub mod solver;
 
 pub use build::{

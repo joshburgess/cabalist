@@ -15,14 +15,19 @@
 //! - [`templates`] — Project templates for `cabalist init`.
 //! - [`config`] — User configuration loading from `cabalist.toml`.
 
+/// User configuration loading from `cabalist.toml`.
 pub mod config;
+/// Opinionated default values for new projects.
 pub mod defaults;
+/// Curated database of recommended packages for common tasks.
 pub mod deps;
+/// `.cabal` file formatter.
 pub mod fmt;
+/// Opinionated lints that check `.cabal` files against best practices.
 pub mod lints;
+/// Project templates for `cabalist init`.
 pub mod templates;
 
-// Re-export key types at the crate root for convenience.
 pub use config::{CabalistConfig, ConfigError};
 pub use defaults::{
     DEFAULT_CABAL_VERSION, DEFAULT_EXTENSIONS, DEFAULT_GHC_OPTIONS, DEFAULT_LANGUAGE,

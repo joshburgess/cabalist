@@ -29,13 +29,21 @@
 //! assert_eq!(result.cst.render(), source);
 //! ```
 
+/// Typed abstract syntax tree derived from the CST.
 pub mod ast;
+/// Concrete syntax tree with byte-identical round-trip fidelity.
 pub mod cst;
+/// Parser diagnostics (errors and warnings).
 pub mod diagnostic;
+/// CST mutation operations (add, remove, update fields).
 pub mod edit;
+/// Lexer that tokenizes `.cabal` source into CST nodes.
 pub mod lexer;
+/// Parser that builds a CST from source text.
 pub mod parse;
+/// Byte spans and node identifiers.
 pub mod span;
+/// Structural validation of parsed `.cabal` files.
 pub mod validate;
 
 // Re-export the main entry point and key types at the crate root.

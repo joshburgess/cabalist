@@ -20,12 +20,18 @@
 //! assert_eq!(bounds.to_string(), ">=2.2.1.0 && <2.3");
 //! ```
 
+/// Error types for Hackage operations.
 pub mod error;
+/// In-memory package index with cache persistence.
 pub mod index;
+/// PVP version bound computation.
 pub mod pvp;
+/// Fuzzy package search and ranking.
 pub mod search;
+/// Core types: `Version`, `PackageInfo`, `VersionRange`.
 pub mod types;
 
+/// HTTP client for downloading and updating the Hackage index.
 #[cfg(feature = "network")]
 pub mod client;
 
