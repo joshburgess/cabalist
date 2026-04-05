@@ -103,9 +103,18 @@ fn print_dependency_tree(ast: &cabalist_parser::ast::CabalFile<'_>) {
     }
 }
 
+#[derive(Debug)]
+enum DepStatus {
+    /// Constraint excludes the latest version.
+    Outdated,
+    /// Latest version satisfies constraint, but a newer version exists.
+    Current,
+    /// Package not found in the Hackage index.
+    Unknown,
+}
+
 /// Print outdated dependencies by comparing against the Hackage index.
 fn print_outdated_deps(ast: &cabalist_parser::ast::CabalFile<'_>) {
-    // Try to load the cached Hackage index.
     let cache_dir = directories::ProjectDirs::from("", "", "cabalist")
         .map(|dirs| dirs.cache_dir().to_path_buf());
     let index = cache_dir.and_then(|dir| {
@@ -115,9 +124,9 @@ fn print_outdated_deps(ast: &cabalist_parser::ast::CabalFile<'_>) {
 
     let Some(index) = index else {
         eprintln!(
-            "{}: Hackage index not found. Run the TUI to download it, \
-             or check ~/.cache/cabalist/index.json exists.",
-            "warning".yellow().bold()
+            "{}: Hackage index not found. Run {} to download it.",
+            "warning".yellow().bold(),
+            "cabalist-cli update-index".bold()
         );
         eprintln!("Showing dependency list without version comparison.\n");
         print_dependency_list(ast);
@@ -130,57 +139,109 @@ fn print_outdated_deps(ast: &cabalist_parser::ast::CabalFile<'_>) {
         return;
     }
 
-    let mut any_outdated = false;
+    // Collect all unique dependencies across components.
+    let mut seen = std::collections::HashSet::new();
+    let mut rows: Vec<(&str, Option<&VersionRange>, String, DepStatus)> = Vec::new();
 
     for comp in &components {
-        let comp_name = component_display_name(comp);
-        let deps = &comp.fields().build_depends;
-        if deps.is_empty() {
-            continue;
-        }
+        for dep in &comp.fields().build_depends {
+            if !seen.insert(dep.package) {
+                continue;
+            }
 
-        let mut comp_outdated = Vec::new();
-        for dep in deps {
             let Some(latest) = index.latest_version(dep.package) else {
+                rows.push((dep.package, dep.version_range.as_ref(), "?".to_string(), DepStatus::Unknown));
                 continue;
             };
 
-            // Check if the current constraint would accept the latest version.
-            // Convert hackage Version to parser Version for comparison.
+            let latest_str = latest.to_string();
             let parser_version = cabalist_parser::ast::Version {
                 components: latest.components.clone(),
             };
-            let constrained = match &dep.version_range {
-                Some(vr) => !cabalist_parser::ast::version_satisfies(&parser_version, vr),
-                None => false, // "any" accepts everything
+
+            let status = match &dep.version_range {
+                Some(vr) => {
+                    if cabalist_parser::ast::version_satisfies(&parser_version, vr) {
+                        DepStatus::Current
+                    } else {
+                        DepStatus::Outdated
+                    }
+                }
+                None => DepStatus::Current,
             };
 
-            if constrained {
-                comp_outdated.push((dep.package, &dep.version_range, latest));
-            }
-        }
-
-        if !comp_outdated.is_empty() {
-            any_outdated = true;
-            println!("{}", comp_name.bold());
-            for (pkg, current_vr, latest) in &comp_outdated {
-                let current = match current_vr {
-                    Some(vr) => format!("{vr}"),
-                    None => "(any)".to_string(),
-                };
-                println!(
-                    "  {:<30} {:<25} → latest: {}",
-                    pkg,
-                    current,
-                    latest.to_string().green()
-                );
-            }
-            println!();
+            rows.push((dep.package, dep.version_range.as_ref(), latest_str, status));
         }
     }
 
-    if !any_outdated {
-        println!("{}", "All dependencies are up to date.".green());
+    // Compute column widths.
+    let pkg_width = rows.iter().map(|r| r.0.len()).max().unwrap_or(7).max(7);
+    let constraint_width = rows
+        .iter()
+        .map(|r| match r.1 {
+            Some(vr) => format!("{vr}").len(),
+            None => 5,
+        })
+        .max()
+        .unwrap_or(10)
+        .max(10);
+    let latest_width = rows.iter().map(|r| r.2.len()).max().unwrap_or(6).max(6);
+
+    // Print header.
+    println!(
+        "  {:<pkg_width$}  {:<constraint_width$}  {:<latest_width$}  {}",
+        "Package".bold(),
+        "Constraint".bold(),
+        "Latest".bold(),
+        "Status".bold(),
+    );
+    println!(
+        "  {:<pkg_width$}  {:<constraint_width$}  {:<latest_width$}  ──────",
+        "─".repeat(pkg_width),
+        "─".repeat(constraint_width),
+        "─".repeat(latest_width),
+    );
+
+    let mut outdated_count = 0;
+    let mut unknown_count = 0;
+
+    for (pkg, constraint, latest, status) in &rows {
+        let constraint_str = match constraint {
+            Some(vr) => format!("{vr}"),
+            None => "(any)".to_string(),
+        };
+
+        let (status_str, latest_colored) = match status {
+            DepStatus::Outdated => {
+                outdated_count += 1;
+                ("outdated".red().bold().to_string(), latest.red().to_string())
+            }
+            DepStatus::Current => ("ok".green().to_string(), latest.to_string()),
+            DepStatus::Unknown => {
+                unknown_count += 1;
+                ("unknown".dimmed().to_string(), latest.dimmed().to_string())
+            }
+        };
+
+        println!(
+            "  {:<pkg_width$}  {:<constraint_width$}  {:<latest_width$}  {}",
+            pkg, constraint_str, latest_colored, status_str,
+        );
+    }
+
+    // Summary line.
+    println!();
+    let total = rows.len();
+    let current = total - outdated_count - unknown_count;
+    if outdated_count > 0 {
+        println!(
+            "  {} outdated, {} up to date, {} total",
+            format!("{outdated_count}").red().bold(),
+            format!("{current}").green(),
+            total
+        );
+    } else {
+        println!("  {}", "All dependencies are up to date.".green());
     }
 }
 
