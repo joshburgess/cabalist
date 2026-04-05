@@ -88,9 +88,7 @@ pub fn hover(
         None
     };
 
-    let Some(field_name) = field_name else {
-        return None;
-    };
+    let field_name = field_name?;
 
     // Find the word under the cursor.
     let word = word_at_offset(source, offset)?;

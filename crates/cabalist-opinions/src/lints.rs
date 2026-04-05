@@ -767,7 +767,7 @@ fn lint_stale_tested_with(file: &CabalFile<'_>, config: &LintConfig, lints: &mut
     const CURRENT_GHC_MAJOR: (u64, u64) = (9, 12);
     const STALE_THRESHOLD: u64 = 2; // 2 minor releases behind the major series
 
-    let Some(ref tested_with) = file.tested_with else {
+    let Some(tested_with) = file.tested_with else {
         return;
     };
 
@@ -781,7 +781,7 @@ fn lint_stale_tested_with(file: &CabalFile<'_>, config: &LintConfig, lints: &mut
         let version_part = segment
             .trim_start_matches(|c: char| c.is_ascii_alphabetic())
             .trim()
-            .trim_start_matches(|c: char| c == '=' || c == '>' || c == '<' || c == '^')
+            .trim_start_matches(['=', '>', '<', '^'])
             .trim();
 
         if version_part.is_empty() {
@@ -855,7 +855,7 @@ fn lint_string_gaps(
             let source_dirs: Vec<&str> = if fields.hs_source_dirs.is_empty() {
                 vec!["."]
             } else {
-                fields.hs_source_dirs.iter().copied().collect()
+                fields.hs_source_dirs.to_vec()
             };
 
             // Check that source directories exist.
@@ -900,7 +900,7 @@ fn lint_string_gaps(
                         span: span_for_node(file, fields.cst_node),
                         suggestion: Some(format!(
                             "Create '{}.hs' or remove '{module}' from the module list",
-                            rel_path.replace('/', "/")
+                            rel_path
                         )),
                     });
                 }

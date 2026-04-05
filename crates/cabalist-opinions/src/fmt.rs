@@ -28,7 +28,7 @@ pub fn sort_list_field(source: &str, field_name: &str) -> String {
         }
 
         let mut sorted = items.clone();
-        sorted.sort_by(|a, b| a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()));
+        sorted.sort_by_key(|a| a.to_ascii_lowercase());
         if items == sorted {
             continue;
         }

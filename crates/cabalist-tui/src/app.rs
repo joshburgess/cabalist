@@ -141,7 +141,15 @@ impl InitWizard {
             input_buffer: dir_name,
         }
     }
+}
 
+impl Default for InitWizard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl InitWizard {
     /// Get the current field value based on the step.
     fn current_value(&self) -> &str {
         match self.step {
@@ -1337,7 +1345,7 @@ fn set_project_field_in_source(source: &str, field_name: &str, value: &str) -> S
         if skip_continuation {
             // Continuation lines are indented (start with whitespace) and non-empty.
             let is_continuation = !line.is_empty()
-                && line.starts_with(|c: char| c == ' ' || c == '\t')
+                && line.starts_with([' ', '\t'])
                 && !line.trim().is_empty();
             if is_continuation {
                 continue; // Skip this continuation line.

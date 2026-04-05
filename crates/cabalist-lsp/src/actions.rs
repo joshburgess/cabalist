@@ -130,17 +130,13 @@ fn action_for_lint(
                 .and_then(|c| c.strip_prefix(">="))
                 .map(|v| v.trim().to_string());
 
-            if let Some(version) = lower_version {
-                Some(make_replace_action(
+            lower_version.map(|version| make_replace_action(
                     &format!("Add PVP upper bound: ^>={version}"),
                     uri,
                     diag.range,
                     &format!("{pkg_name} ^>={version}"),
                     diag,
                 ))
-            } else {
-                None
-            }
         }
         "duplicate-dep" => {
             // The diagnostic range points to the duplicate dependency line.
@@ -172,17 +168,13 @@ fn action_for_lint(
                 .and_then(|c| c.strip_prefix("<"))
                 .map(|v| v.trim().to_string());
 
-            if let Some(version) = upper_version {
-                Some(make_replace_action(
+            upper_version.map(|version| make_replace_action(
                     &format!("Add PVP bounds: ^>={version}"),
                     uri,
                     diag.range,
                     &format!("{pkg_name} ^>={version}"),
                     diag,
                 ))
-            } else {
-                None
-            }
         }
         "wide-any-version" => {
             let (pkg_name, _) = extract_dep_data(diag);
