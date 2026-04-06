@@ -14,7 +14,7 @@ The guiding principle: **make pure-Cabal Haskell development as approachable as 
 ## What Cabalist Does
 
 - **Manages dependencies** — search Hackage, add packages with correct PVP bounds, detect outdated versions, visualize the dependency tree
-- **Manages GHC extensions** — browse 200+ extensions with descriptions and safety notes, toggle them on/off
+- **Manages GHC extensions** — browse 119 extensions with descriptions and safety notes, toggle them on/off
 - **Lints your .cabal file** — 16 opinionated, individually configurable checks that catch missing bounds, bad practices, and structural issues
 - **Formats your .cabal file** — round-trip safe formatting with optional alphabetical sorting
 - **Builds your project** — run `cabal build`, `cabal test`, and `cabal clean` with streaming output and error navigation
