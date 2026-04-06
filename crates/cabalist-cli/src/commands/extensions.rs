@@ -77,6 +77,29 @@ fn toggle_extension(
     let cst = &result.cst;
     let ast = cabalist_parser::ast::derive_ast(cst);
 
+    // Warn if the extension name isn't recognized.
+    if cabalist_ghc::extensions::extension_info(ext_name).is_none() {
+        let all = cabalist_ghc::extensions::load_extensions();
+        // Try case-insensitive match for a helpful suggestion.
+        let suggestion = all
+            .iter()
+            .find(|e| e.name.eq_ignore_ascii_case(ext_name))
+            .map(|e| e.name.as_str());
+
+        if let Some(correct) = suggestion {
+            anyhow::bail!(
+                "Unknown extension '{}'. Did you mean '{}'?",
+                ext_name,
+                correct
+            );
+        } else {
+            eprintln!(
+                "warning: '{}' is not a recognized GHC extension",
+                ext_name
+            );
+        }
+    }
+
     let (keyword, name) = util::parse_component_spec(component);
     let section_id = edit::find_section(cst, keyword, name).ok_or_else(|| {
         anyhow::anyhow!("Component '{}' not found", component)
