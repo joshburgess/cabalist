@@ -53,7 +53,7 @@ nix run github:joshburgess/cabalist
 
 ### From Source
 
-Requires Rust 1.75+:
+Requires Rust 1.88+:
 
 ```sh
 cargo install --path crates/cabalist-tui   # Interactive TUI

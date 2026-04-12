@@ -1,4 +1,4 @@
-FROM rust:1.75-slim AS builder
+FROM rust:1.88-slim AS builder
 WORKDIR /build
 COPY . .
 RUN cargo build --release -p cabalist-cli

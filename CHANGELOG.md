@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Editors**: Neovim and Emacs LSP configuration guides
 - **Project**: `cabal.project` file parser
 - **Testing**: 621+ tests including real-world corpus of 100 `.cabal` files
-- **CI**: Cross-platform GitHub Actions (Linux, macOS, Windows) with MSRV 1.75
+- **CI**: Cross-platform GitHub Actions (Linux, macOS, Windows) with MSRV 1.88
 
 ## [0.1.0] - Unreleased
 
