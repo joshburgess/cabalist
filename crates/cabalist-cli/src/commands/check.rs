@@ -27,7 +27,12 @@ pub fn run(file: &Option<PathBuf>, strict: bool, format: OutputFormat) -> Result
 
     // Derive AST and run opinionated lints (including filesystem-aware lints).
     let ast = derive_ast(&result.cst);
-    let lints = cabalist_opinions::run_all_lints_with_cst(&ast, Some(&result.cst), &lint_config, project_root);
+    let lints = cabalist_opinions::run_all_lints_with_cst(
+        &ast,
+        Some(&result.cst),
+        &lint_config,
+        project_root,
+    );
 
     match format {
         OutputFormat::Json => print_json_output(&cabal_path, &source, &validation_diags, &lints),
@@ -95,11 +100,7 @@ pub fn run(file: &Option<PathBuf>, strict: bool, format: OutputFormat) -> Result
 }
 
 /// Run lints in watch mode — re-runs on every file change.
-pub fn run_watch(
-    file: &Option<PathBuf>,
-    strict: bool,
-    format: OutputFormat,
-) -> Result<ExitCode> {
+pub fn run_watch(file: &Option<PathBuf>, strict: bool, format: OutputFormat) -> Result<ExitCode> {
     use colored::Colorize;
     use notify::{RecursiveMode, Watcher};
     use std::sync::mpsc;
@@ -144,10 +145,7 @@ pub fn run_watch(
             cabal_path.display()
         );
         let _ = run(&Some(cabal_path.clone()), strict, format);
-        eprintln!(
-            "\n{} for changes...",
-            "Watching".green().bold()
-        );
+        eprintln!("\n{} for changes...", "Watching".green().bold());
     }
 }
 

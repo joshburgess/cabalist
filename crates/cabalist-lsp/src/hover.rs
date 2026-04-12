@@ -67,7 +67,12 @@ pub fn hover(
             // Is the cursor within the field name?
             if offset >= field_name_start && offset <= field_name_end {
                 let canonical = field_name_part.to_ascii_lowercase().replace('_', "-");
-                return hover_field_name(&canonical, &doc.line_index, field_name_start, field_name_end);
+                return hover_field_name(
+                    &canonical,
+                    &doc.line_index,
+                    field_name_start,
+                    field_name_end,
+                );
             }
         }
     }
@@ -94,9 +99,13 @@ pub fn hover(
     let word = word_at_offset(source, offset)?;
 
     match field_name.as_str() {
-        "default-extensions" | "other-extensions" => hover_extension(&word, &doc.line_index, offset, &word),
+        "default-extensions" | "other-extensions" => {
+            hover_extension(&word, &doc.line_index, offset, &word)
+        }
         "ghc-options" | "ghc-prof-options" => hover_warning(&word, &doc.line_index, offset, &word),
-        "build-depends" | "build-tool-depends" => hover_package(&word, &doc.line_index, offset, &word, hackage),
+        "build-depends" | "build-tool-depends" => {
+            hover_package(&word, &doc.line_index, offset, &word, hackage)
+        }
         _ => None,
     }
 }
@@ -151,12 +160,7 @@ fn hover_extension(
     })
 }
 
-fn hover_warning(
-    flag: &str,
-    line_index: &LineIndex,
-    offset: usize,
-    word: &str,
-) -> Option<Hover> {
+fn hover_warning(flag: &str, line_index: &LineIndex, offset: usize, word: &str) -> Option<Hover> {
     let w = cabalist_ghc::warnings::warning_info(flag)?;
     let mut doc = format!("**{}**\n\n{}", w.flag, w.description);
     doc.push_str(&format!("\n\n*Since GHC {}*", w.since));
@@ -325,7 +329,8 @@ mod tests {
 
     #[test]
     fn hover_on_extension_continuation_line() {
-        let source = "library\n  default-extensions:\n    OverloadedStrings\n    DerivingStrategies\n";
+        let source =
+            "library\n  default-extensions:\n    OverloadedStrings\n    DerivingStrategies\n";
         let offset = source.find("DerivingStrategies").unwrap() + 3;
         let content = hover_at(source, offset);
         assert!(content.is_some());
@@ -364,7 +369,10 @@ mod tests {
     fn find_parent_field_basic() {
         let source = "library\n  build-depends:\n    base\n    ";
         let from = source.rfind("    ").unwrap();
-        assert_eq!(find_parent_field(source, from), Some("build-depends".into()));
+        assert_eq!(
+            find_parent_field(source, from),
+            Some("build-depends".into())
+        );
     }
 
     #[test]
@@ -372,6 +380,9 @@ mod tests {
         let source = "library\n  exposed-modules: Foo\n";
         let from = source.len();
         // Looking from end, should find exposed-modules.
-        assert_eq!(find_parent_field(source, from), Some("exposed-modules".into()));
+        assert_eq!(
+            find_parent_field(source, from),
+            Some("exposed-modules".into())
+        );
     }
 }

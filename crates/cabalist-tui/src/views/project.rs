@@ -32,7 +32,7 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(6), // project overview
-            Constraint::Min(4),   // details
+            Constraint::Min(4),    // details
         ])
         .split(area);
 
@@ -62,13 +62,14 @@ fn render_overview(
 
     // Packages (informational, not editable).
     let pkg_count = project.packages.len();
-    let pkg_label = if pkg_count == 1 { "package" } else { "packages" };
+    let pkg_label = if pkg_count == 1 {
+        "package"
+    } else {
+        "packages"
+    };
     lines.push(Line::from(vec![
         Span::styled("  Packages:     ", theme.muted_style()),
-        Span::styled(
-            format!("{pkg_count} {pkg_label}"),
-            theme.normal(),
-        ),
+        Span::styled(format!("{pkg_count} {pkg_label}"), theme.normal()),
         Span::styled(
             format!("  ({})", project.packages.join(", ")),
             theme.muted_style(),
@@ -163,12 +164,20 @@ fn render_details(
     // Constraints.
     if !project.constraints.is_empty() {
         let is_selected = item_idx == app.selected_index;
-        let style = if is_selected { theme.selected() } else { theme.label_style() };
+        let style = if is_selected {
+            theme.selected()
+        } else {
+            theme.label_style()
+        };
         lines.push(Line::from(Span::styled("  Constraints:", style)));
         item_idx += 1;
         for c in &project.constraints {
             let is_selected = item_idx == app.selected_index;
-            let style = if is_selected { theme.selected() } else { theme.normal() };
+            let style = if is_selected {
+                theme.selected()
+            } else {
+                theme.normal()
+            };
             lines.push(Line::from(Span::styled(format!("    {c}"), style)));
             item_idx += 1;
         }
@@ -178,12 +187,20 @@ fn render_details(
     // Allow-newer.
     if !project.allow_newer.is_empty() {
         let is_selected = item_idx == app.selected_index;
-        let style = if is_selected { theme.selected() } else { theme.label_style() };
+        let style = if is_selected {
+            theme.selected()
+        } else {
+            theme.label_style()
+        };
         lines.push(Line::from(Span::styled("  Allow-newer:", style)));
         item_idx += 1;
         for a in &project.allow_newer {
             let is_selected = item_idx == app.selected_index;
-            let style = if is_selected { theme.selected() } else { theme.warning_style() };
+            let style = if is_selected {
+                theme.selected()
+            } else {
+                theme.warning_style()
+            };
             lines.push(Line::from(Span::styled(format!("    {a}"), style)));
             item_idx += 1;
         }
@@ -193,12 +210,20 @@ fn render_details(
     // Allow-older.
     if !project.allow_older.is_empty() {
         let is_selected = item_idx == app.selected_index;
-        let style = if is_selected { theme.selected() } else { theme.label_style() };
+        let style = if is_selected {
+            theme.selected()
+        } else {
+            theme.label_style()
+        };
         lines.push(Line::from(Span::styled("  Allow-older:", style)));
         item_idx += 1;
         for a in &project.allow_older {
             let is_selected = item_idx == app.selected_index;
-            let style = if is_selected { theme.selected() } else { theme.warning_style() };
+            let style = if is_selected {
+                theme.selected()
+            } else {
+                theme.warning_style()
+            };
             lines.push(Line::from(Span::styled(format!("    {a}"), style)));
             item_idx += 1;
         }
@@ -208,18 +233,30 @@ fn render_details(
     // Source repository packages.
     if !project.source_repo_packages.is_empty() {
         let is_selected = item_idx == app.selected_index;
-        let style = if is_selected { theme.selected() } else { theme.label_style() };
-        lines.push(Line::from(Span::styled("  Source Repository Packages:", style)));
+        let style = if is_selected {
+            theme.selected()
+        } else {
+            theme.label_style()
+        };
+        lines.push(Line::from(Span::styled(
+            "  Source Repository Packages:",
+            style,
+        )));
         item_idx += 1;
         for repo in &project.source_repo_packages {
             let is_selected = item_idx == app.selected_index;
-            let style = if is_selected { theme.selected() } else { theme.normal() };
+            let style = if is_selected {
+                theme.selected()
+            } else {
+                theme.normal()
+            };
             let loc = repo.location.as_deref().unwrap_or("(no location)");
-            let tag = repo.tag.as_deref().map(|t| format!(" @ {t}")).unwrap_or_default();
-            lines.push(Line::from(Span::styled(
-                format!("    {loc}{tag}"),
-                style,
-            )));
+            let tag = repo
+                .tag
+                .as_deref()
+                .map(|t| format!(" @ {t}"))
+                .unwrap_or_default();
+            lines.push(Line::from(Span::styled(format!("    {loc}{tag}"), style)));
             item_idx += 1;
         }
         lines.push(Line::default());
@@ -228,12 +265,20 @@ fn render_details(
     // Package stanzas.
     if !project.package_stanzas.is_empty() {
         let is_selected = item_idx == app.selected_index;
-        let style = if is_selected { theme.selected() } else { theme.label_style() };
+        let style = if is_selected {
+            theme.selected()
+        } else {
+            theme.label_style()
+        };
         lines.push(Line::from(Span::styled("  Package Stanzas:", style)));
         item_idx += 1;
         for stanza in &project.package_stanzas {
             let is_selected = item_idx == app.selected_index;
-            let style = if is_selected { theme.selected() } else { theme.normal() };
+            let style = if is_selected {
+                theme.selected()
+            } else {
+                theme.normal()
+            };
             let field_count = stanza.fields.len();
             let label = if field_count == 1 { "field" } else { "fields" };
             lines.push(Line::from(Span::styled(
@@ -248,12 +293,20 @@ fn render_details(
     // Other fields.
     if !project.other_fields.is_empty() {
         let is_selected = item_idx == app.selected_index;
-        let style = if is_selected { theme.selected() } else { theme.label_style() };
+        let style = if is_selected {
+            theme.selected()
+        } else {
+            theme.label_style()
+        };
         lines.push(Line::from(Span::styled("  Other Fields:", style)));
         item_idx += 1;
         for (key, value) in &project.other_fields {
             let is_selected = item_idx == app.selected_index;
-            let style = if is_selected { theme.selected() } else { theme.normal() };
+            let style = if is_selected {
+                theme.selected()
+            } else {
+                theme.normal()
+            };
             let truncated = if value.len() > 50 {
                 format!("{}...", &value[..47])
             } else {

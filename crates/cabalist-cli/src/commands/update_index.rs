@@ -10,10 +10,7 @@ pub fn run() -> Result<ExitCode> {
         .map(|dirs| dirs.cache_dir().to_path_buf())
         .ok_or_else(|| anyhow::anyhow!("Could not determine cache directory"))?;
 
-    println!(
-        "Downloading Hackage index to {}...",
-        cache_dir.display()
-    );
+    println!("Downloading Hackage index to {}...", cache_dir.display());
 
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {

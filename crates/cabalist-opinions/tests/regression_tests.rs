@@ -188,19 +188,25 @@ library
     for diag in &diags {
         assert!(
             !diag.message.contains("duplicate field: `build-depends`"),
-            "build-depends should be repeatable: {}", diag.message
+            "build-depends should be repeatable: {}",
+            diag.message
         );
         assert!(
             !diag.message.contains("duplicate field: `ghc-options`"),
-            "ghc-options should be repeatable: {}", diag.message
+            "ghc-options should be repeatable: {}",
+            diag.message
         );
         assert!(
-            !diag.message.contains("duplicate field: `default-extensions`"),
-            "default-extensions should be repeatable: {}", diag.message
+            !diag
+                .message
+                .contains("duplicate field: `default-extensions`"),
+            "default-extensions should be repeatable: {}",
+            diag.message
         );
         assert!(
             !diag.message.contains("duplicate field: `other-modules`"),
-            "other-modules should be repeatable: {}", diag.message
+            "other-modules should be repeatable: {}",
+            diag.message
         );
     }
 }
@@ -221,7 +227,9 @@ library
     let diags = cabalist_parser::validate(&result.cst);
 
     assert!(
-        diags.iter().any(|d| d.message.contains("duplicate field: `default-language`")),
+        diags
+            .iter()
+            .any(|d| d.message.contains("duplicate field: `default-language`")),
         "non-repeatable field should still be flagged as duplicate"
     );
 }
@@ -265,7 +273,9 @@ fn real_world_files_no_false_duplicate_warnings() {
         for diag in &diags {
             for field in &repeatable {
                 assert!(
-                    !diag.message.contains(&format!("duplicate field: `{field}`")),
+                    !diag
+                        .message
+                        .contains(&format!("duplicate field: `{field}`")),
                     "{}: false positive duplicate warning for repeatable field '{field}': {}",
                     path.display(),
                     diag.message

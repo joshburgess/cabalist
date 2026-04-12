@@ -25,7 +25,12 @@ pub fn run(file: &Option<PathBuf>, format: OutputFormat) -> Result<ExitCode> {
 
     // Run validation + lints (including filesystem-aware lints) for health summary.
     let validation_diags = cabalist_parser::validate(&result.cst);
-    let lints = cabalist_opinions::run_all_lints_with_cst(&ast, Some(&result.cst), &lint_config, project_root);
+    let lints = cabalist_opinions::run_all_lints_with_cst(
+        &ast,
+        Some(&result.cst),
+        &lint_config,
+        project_root,
+    );
 
     match format {
         OutputFormat::Json => print_json_info(&ast, &validation_diags, &lints),

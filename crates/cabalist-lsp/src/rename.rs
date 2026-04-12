@@ -119,11 +119,7 @@ pub fn rename(
 /// Find the common stanza name referenced at the given position.
 ///
 /// Works on both `common <name>` definitions and `import: <name>` references.
-fn find_stanza_name_at(
-    source: &str,
-    line_index: &LineIndex,
-    position: Position,
-) -> Option<String> {
+fn find_stanza_name_at(source: &str, line_index: &LineIndex, position: Position) -> Option<String> {
     let offset = line_index.position_to_offset(position);
     let line_start = source[..offset].rfind('\n').map(|i| i + 1).unwrap_or(0);
     let line_end = source[offset..]
@@ -178,7 +174,10 @@ executable my-app
     fn prepare_rename_on_common_definition() {
         let source = test_source();
         let li = LineIndex::new(source);
-        let pos = Position { line: 4, character: 10 }; // on "warnings" in "common warnings"
+        let pos = Position {
+            line: 4,
+            character: 10,
+        }; // on "warnings" in "common warnings"
         let result = prepare_rename(source, &li, pos);
         assert!(result.is_some());
     }
@@ -187,7 +186,10 @@ executable my-app
     fn prepare_rename_on_import_reference() {
         let source = test_source();
         let li = LineIndex::new(source);
-        let pos = Position { line: 8, character: 12 }; // on "warnings" in "import: warnings"
+        let pos = Position {
+            line: 8,
+            character: 12,
+        }; // on "warnings" in "import: warnings"
         let result = prepare_rename(source, &li, pos);
         assert!(result.is_some());
     }
@@ -196,7 +198,10 @@ executable my-app
     fn prepare_rename_on_unrelated_line() {
         let source = test_source();
         let li = LineIndex::new(source);
-        let pos = Position { line: 1, character: 3 }; // on "name: test"
+        let pos = Position {
+            line: 1,
+            character: 3,
+        }; // on "name: test"
         let result = prepare_rename(source, &li, pos);
         assert!(result.is_none());
     }
@@ -206,7 +211,10 @@ executable my-app
         let source = test_source();
         let li = LineIndex::new(source);
         let uri = Url::parse("file:///test.cabal").unwrap();
-        let pos = Position { line: 4, character: 10 };
+        let pos = Position {
+            line: 4,
+            character: 10,
+        };
 
         let result = rename(source, &li, &uri, pos, "shared-opts");
         assert!(result.is_some());
@@ -226,7 +234,10 @@ executable my-app
         let source = test_source();
         let li = LineIndex::new(source);
         let uri = Url::parse("file:///test.cabal").unwrap();
-        let pos = Position { line: 8, character: 12 }; // on import: warnings
+        let pos = Position {
+            line: 8,
+            character: 12,
+        }; // on import: warnings
 
         let result = rename(source, &li, &uri, pos, "common-settings");
         assert!(result.is_some());

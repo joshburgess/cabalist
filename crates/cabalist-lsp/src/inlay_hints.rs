@@ -90,8 +90,14 @@ mod tests {
         let source = "cabal-version: 3.0\nname: test\nversion: 0.1\n\nlibrary\n  build-depends: base ^>=4.17\n";
         let line_index = LineIndex::new(source);
         let range = Range {
-            start: Position { line: 0, character: 0 },
-            end: Position { line: 10, character: 0 },
+            start: Position {
+                line: 0,
+                character: 0,
+            },
+            end: Position {
+                line: 10,
+                character: 0,
+            },
         };
         let hints = inlay_hints(source, &line_index, &range, None);
         assert!(hints.is_empty());
@@ -104,7 +110,10 @@ mod tests {
         let packages = vec![PackageInfo {
             name: "base".to_string(),
             synopsis: "Basic libraries".to_string(),
-            versions: vec![Version::parse("4.17.0.0").unwrap(), Version::parse("4.19.1.0").unwrap()],
+            versions: vec![
+                Version::parse("4.17.0.0").unwrap(),
+                Version::parse("4.19.1.0").unwrap(),
+            ],
             deprecated: false,
         }];
         let index = HackageIndex::from_packages(packages);
@@ -112,10 +121,19 @@ mod tests {
         let source = "cabal-version: 3.0\nname: test\nversion: 0.1\n\nlibrary\n  build-depends: base ^>=4.17\n";
         let line_index = LineIndex::new(source);
         let range = Range {
-            start: Position { line: 0, character: 0 },
-            end: Position { line: 10, character: 0 },
+            start: Position {
+                line: 0,
+                character: 0,
+            },
+            end: Position {
+                line: 10,
+                character: 0,
+            },
         };
         let hints = inlay_hints(source, &line_index, &range, Some(&index));
-        assert!(!hints.is_empty(), "should produce hints when Hackage data is available");
+        assert!(
+            !hints.is_empty(),
+            "should produce hints when Hackage data is available"
+        );
     }
 }

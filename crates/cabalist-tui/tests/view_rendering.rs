@@ -144,13 +144,31 @@ fn deps_view_shows_all_dependencies() {
     app.current_view = cabalist_tui::views::View::Dependencies;
     let output = render_to_string(&app, 80, 24);
     // Verify all 3 dependencies are shown.
-    assert!(output.contains("base"), "Should show 'base'.\nOutput:\n{output}");
-    assert!(output.contains("text"), "Should show 'text'.\nOutput:\n{output}");
-    assert!(output.contains("aeson"), "Should show 'aeson'.\nOutput:\n{output}");
+    assert!(
+        output.contains("base"),
+        "Should show 'base'.\nOutput:\n{output}"
+    );
+    assert!(
+        output.contains("text"),
+        "Should show 'text'.\nOutput:\n{output}"
+    );
+    assert!(
+        output.contains("aeson"),
+        "Should show 'aeson'.\nOutput:\n{output}"
+    );
     // Verify version constraints are displayed.
-    assert!(output.contains("^>=4.17"), "Should show base constraint.\nOutput:\n{output}");
-    assert!(output.contains("^>=2.0"), "Should show text constraint.\nOutput:\n{output}");
-    assert!(output.contains("^>=2.2"), "Should show aeson constraint.\nOutput:\n{output}");
+    assert!(
+        output.contains("^>=4.17"),
+        "Should show base constraint.\nOutput:\n{output}"
+    );
+    assert!(
+        output.contains("^>=2.0"),
+        "Should show text constraint.\nOutput:\n{output}"
+    );
+    assert!(
+        output.contains("^>=2.2"),
+        "Should show aeson constraint.\nOutput:\n{output}"
+    );
 }
 
 #[test]
@@ -182,14 +200,35 @@ fn metadata_view_shows_all_fields() {
     app.current_view = cabalist_tui::views::View::Metadata;
     let output = render_to_string(&app, 80, 24);
     // Verify key field labels are present.
-    assert!(output.contains("name"), "Should show 'name' label.\nOutput:\n{output}");
-    assert!(output.contains("version"), "Should show 'version' label.\nOutput:\n{output}");
-    assert!(output.contains("license"), "Should show 'license' label.\nOutput:\n{output}");
+    assert!(
+        output.contains("name"),
+        "Should show 'name' label.\nOutput:\n{output}"
+    );
+    assert!(
+        output.contains("version"),
+        "Should show 'version' label.\nOutput:\n{output}"
+    );
+    assert!(
+        output.contains("license"),
+        "Should show 'license' label.\nOutput:\n{output}"
+    );
     // Verify values are displayed.
-    assert!(output.contains("test-pkg"), "Should show package name value.\nOutput:\n{output}");
-    assert!(output.contains("MIT"), "Should show license value.\nOutput:\n{output}");
-    assert!(output.contains("0.1.0.0"), "Should show version value.\nOutput:\n{output}");
-    assert!(output.contains("A test package"), "Should show synopsis.\nOutput:\n{output}");
+    assert!(
+        output.contains("test-pkg"),
+        "Should show package name value.\nOutput:\n{output}"
+    );
+    assert!(
+        output.contains("MIT"),
+        "Should show license value.\nOutput:\n{output}"
+    );
+    assert!(
+        output.contains("0.1.0.0"),
+        "Should show version value.\nOutput:\n{output}"
+    );
+    assert!(
+        output.contains("A test package"),
+        "Should show synopsis.\nOutput:\n{output}"
+    );
 }
 
 #[test]
@@ -251,9 +290,18 @@ fn dashboard_shows_component_counts() {
     let app = make_test_app();
     let output = render_to_string(&app, 80, 24);
     // Should show library with 3 deps and exe/test with 2 deps each.
-    assert!(output.contains("3 deps"), "Should show library dep count.\nOutput:\n{output}");
-    assert!(output.contains("test-exe"), "Should show executable name.\nOutput:\n{output}");
-    assert!(output.contains("test-tests"), "Should show test-suite name.\nOutput:\n{output}");
+    assert!(
+        output.contains("3 deps"),
+        "Should show library dep count.\nOutput:\n{output}"
+    );
+    assert!(
+        output.contains("test-exe"),
+        "Should show executable name.\nOutput:\n{output}"
+    );
+    assert!(
+        output.contains("test-tests"),
+        "Should show test-suite name.\nOutput:\n{output}"
+    );
 }
 
 #[test]

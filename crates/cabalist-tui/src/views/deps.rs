@@ -27,7 +27,7 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Length(3), // component tabs
-                Constraint::Min(4),   // dependency list
+                Constraint::Min(4),    // dependency list
             ])
             .split(area);
 
@@ -250,10 +250,7 @@ fn render_dep_list(frame: &mut Frame, app: &App, deps: &[DepDisplay], area: Rect
 
         // Show outdated indicator if we have Hackage data.
         if let Some(ref latest) = dep.outdated_latest {
-            spans.push(Span::styled(
-                format!("  -> {latest}"),
-                theme.error_style(),
-            ));
+            spans.push(Span::styled(format!("  -> {latest}"), theme.error_style()));
         }
 
         lines.push(Line::from(spans));
@@ -293,7 +290,11 @@ fn render_tree_mode(
 
     for (ci, comp) in all_components.iter().enumerate() {
         let is_last_comp = ci == all_components.len() - 1;
-        let comp_prefix = if is_last_comp { "  └── " } else { "  ├── " };
+        let comp_prefix = if is_last_comp {
+            "  └── "
+        } else {
+            "  ├── "
+        };
         let comp_name = &components[ci.min(components.len().saturating_sub(1))];
 
         let is_selected = flat_idx == app.selected_index;
@@ -313,7 +314,11 @@ fn render_tree_mode(
 
         for (di, dep) in deps.iter().enumerate() {
             let is_last_dep = di == deps.len() - 1;
-            let dep_branch = if is_last_dep { "└── " } else { "├── " };
+            let dep_branch = if is_last_dep {
+                "└── "
+            } else {
+                "├── "
+            };
 
             let version_str = dep
                 .version_range
@@ -335,10 +340,7 @@ fn render_tree_mode(
             )];
 
             if let Some(latest) = outdated {
-                spans.push(Span::styled(
-                    format!("  -> {latest}"),
-                    theme.error_style(),
-                ));
+                spans.push(Span::styled(format!("  -> {latest}"), theme.error_style()));
             }
 
             lines.push(Line::from(spans));

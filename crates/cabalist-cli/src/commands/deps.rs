@@ -150,7 +150,12 @@ fn print_outdated_deps(ast: &cabalist_parser::ast::CabalFile<'_>) {
             }
 
             let Some(latest) = index.latest_version(dep.package) else {
-                rows.push((dep.package, dep.version_range.as_ref(), "?".to_string(), DepStatus::Unknown));
+                rows.push((
+                    dep.package,
+                    dep.version_range.as_ref(),
+                    "?".to_string(),
+                    DepStatus::Unknown,
+                ));
                 continue;
             };
 
@@ -214,7 +219,10 @@ fn print_outdated_deps(ast: &cabalist_parser::ast::CabalFile<'_>) {
         let (status_str, latest_colored) = match status {
             DepStatus::Outdated => {
                 outdated_count += 1;
-                ("outdated".red().bold().to_string(), latest.red().to_string())
+                (
+                    "outdated".red().bold().to_string(),
+                    latest.red().to_string(),
+                )
             }
             DepStatus::Current => ("ok".green().to_string(), latest.to_string()),
             DepStatus::Unknown => {

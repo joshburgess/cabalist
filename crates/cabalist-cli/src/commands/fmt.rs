@@ -25,13 +25,14 @@ pub fn run(file: &Option<PathBuf>, check: bool) -> Result<ExitCode> {
 
     // Sort dependencies if configured.
     if config.formatting.sort_dependencies {
-        current_source = cabalist_opinions::fmt::sort_list_field(&current_source,"build-depends");
+        current_source = cabalist_opinions::fmt::sort_list_field(&current_source, "build-depends");
     }
 
     // Sort modules if configured.
     if config.formatting.sort_modules {
-        current_source = cabalist_opinions::fmt::sort_list_field(&current_source,"exposed-modules");
-        current_source = cabalist_opinions::fmt::sort_list_field(&current_source,"other-modules");
+        current_source =
+            cabalist_opinions::fmt::sort_list_field(&current_source, "exposed-modules");
+        current_source = cabalist_opinions::fmt::sort_list_field(&current_source, "other-modules");
     }
 
     // Re-parse and render to normalize (the round-trip should be clean).

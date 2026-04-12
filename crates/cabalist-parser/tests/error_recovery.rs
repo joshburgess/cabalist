@@ -171,7 +171,10 @@ fn standalone_else_no_crash() {
     let source = "library\n  else\n    ghc-options: -Wall\n";
     let result = parse(source);
     let rendered = result.cst.render();
-    assert!(!rendered.is_empty(), "Standalone else should produce output");
+    assert!(
+        !rendered.is_empty(),
+        "Standalone else should produce output"
+    );
 }
 
 #[test]
@@ -179,7 +182,10 @@ fn empty_section_name() {
     let source = "executable \n  main-is: Main.hs\n";
     let result = parse(source);
     let rendered = result.cst.render();
-    assert_eq!(rendered, source, "Section with trailing space should round-trip");
+    assert_eq!(
+        rendered, source,
+        "Section with trailing space should round-trip"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -188,8 +194,7 @@ fn empty_section_name() {
 
 #[test]
 fn large_file_no_stack_overflow() {
-    let mut source =
-        String::from("cabal-version: 3.0\nname: big\nversion: 0.1\n\n");
+    let mut source = String::from("cabal-version: 3.0\nname: big\nversion: 0.1\n\n");
     // 1000 sections with 10 fields each.
     for i in 0..1000 {
         source.push_str(&format!("executable exe-{i}\n"));
@@ -397,7 +402,10 @@ fn no_trailing_newline() {
     let source = "name: foo\nversion: 0.1";
     let result = parse(source);
     let rendered = result.cst.render();
-    assert_eq!(rendered, source, "File without trailing newline should round-trip");
+    assert_eq!(
+        rendered, source,
+        "File without trailing newline should round-trip"
+    );
 }
 
 // ---------------------------------------------------------------------------

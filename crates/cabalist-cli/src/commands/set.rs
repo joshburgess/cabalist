@@ -37,9 +37,22 @@ const VALID_BUILD_TYPES: &[&str] = &["Simple", "Configure", "Make", "Custom"];
 
 /// Common SPDX license identifiers.
 const VALID_LICENSES: &[&str] = &[
-    "MIT", "BSD-2-Clause", "BSD-3-Clause", "Apache-2.0", "ISC", "MPL-2.0", "GPL-2.0-only",
-    "GPL-2.0-or-later", "GPL-3.0-only", "GPL-3.0-or-later", "LGPL-2.1-only",
-    "LGPL-3.0-only", "AGPL-3.0-only", "0BSD", "Unlicense", "NONE",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Apache-2.0",
+    "ISC",
+    "MPL-2.0",
+    "GPL-2.0-only",
+    "GPL-2.0-or-later",
+    "GPL-3.0-only",
+    "GPL-3.0-or-later",
+    "LGPL-2.1-only",
+    "LGPL-3.0-only",
+    "AGPL-3.0-only",
+    "0BSD",
+    "Unlicense",
+    "NONE",
 ];
 
 pub fn run(file: &Option<PathBuf>, field: &str, value: &str) -> Result<ExitCode> {
@@ -115,7 +128,10 @@ fn validate_field_value(field: &str, value: &str) -> Result<()> {
             }
         }
         "build-type" => {
-            if !VALID_BUILD_TYPES.iter().any(|b| b.eq_ignore_ascii_case(value)) {
+            if !VALID_BUILD_TYPES
+                .iter()
+                .any(|b| b.eq_ignore_ascii_case(value))
+            {
                 bail!(
                     "Invalid build-type '{}'. Must be one of: {}",
                     value,
@@ -132,8 +148,12 @@ fn validate_field_value(field: &str, value: &str) -> Result<()> {
             }
         }
         "homepage" | "bug-reports" => {
-            if !value.is_empty() && !value.starts_with("http://") && !value.starts_with("https://") {
-                eprintln!("warning: '{}' does not look like a URL (expected http:// or https://)", value);
+            if !value.is_empty() && !value.starts_with("http://") && !value.starts_with("https://")
+            {
+                eprintln!(
+                    "warning: '{}' does not look like a URL (expected http:// or https://)",
+                    value
+                );
             }
         }
         _ => {} // No validation for free-text fields.

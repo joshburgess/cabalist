@@ -455,9 +455,7 @@ fn check_import_references(
         // Imports can be comma-separated (e.g., `import: foo, bar`).
         for stanza_name in value.split(',') {
             let stanza_name = stanza_name.trim();
-            if !stanza_name.is_empty()
-                && !ctx.common_stanza_names.contains(stanza_name)
-            {
+            if !stanza_name.is_empty() && !ctx.common_stanza_names.contains(stanza_name) {
                 diagnostics.push(Diagnostic::error(
                     *val_span,
                     format!("import references undefined common stanza: `{stanza_name}`"),
@@ -645,7 +643,10 @@ library
   default-language: GHC2021
 ";
         let diags = validate_source(src);
-        assert!(has_diagnostic(&diags, "duplicate field: `default-language`"));
+        assert!(has_diagnostic(
+            &diags,
+            "duplicate field: `default-language`"
+        ));
     }
 
     #[test]
@@ -949,7 +950,10 @@ library
   default_language: GHC2021
 ";
         let diags = validate_source(src);
-        assert!(has_diagnostic(&diags, "duplicate field: `default-language`"));
+        assert!(has_diagnostic(
+            &diags,
+            "duplicate field: `default-language`"
+        ));
     }
 
     // -- Edge cases ---------------------------------------------------------

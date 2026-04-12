@@ -22,20 +22,18 @@ pub fn run(file: &Option<PathBuf>, toggle: Option<&str>, component: &str) -> Res
 
     let (keyword, name) = util::parse_component_spec(component);
     let components = ast.all_components();
-    let comp = components
-        .iter()
-        .find(|c| match c {
-            cabalist_parser::ast::Component::Library(_) => keyword == "library",
-            cabalist_parser::ast::Component::Executable(e) => {
-                keyword == "executable" && e.fields.name == name
-            }
-            cabalist_parser::ast::Component::TestSuite(t) => {
-                keyword == "test-suite" && t.fields.name == name
-            }
-            cabalist_parser::ast::Component::Benchmark(b) => {
-                keyword == "benchmark" && b.fields.name == name
-            }
-        });
+    let comp = components.iter().find(|c| match c {
+        cabalist_parser::ast::Component::Library(_) => keyword == "library",
+        cabalist_parser::ast::Component::Executable(e) => {
+            keyword == "executable" && e.fields.name == name
+        }
+        cabalist_parser::ast::Component::TestSuite(t) => {
+            keyword == "test-suite" && t.fields.name == name
+        }
+        cabalist_parser::ast::Component::Benchmark(b) => {
+            keyword == "benchmark" && b.fields.name == name
+        }
+    });
 
     let Some(comp) = comp else {
         println!("Component '{}' not found.", component);
@@ -62,7 +60,10 @@ pub fn run(file: &Option<PathBuf>, toggle: Option<&str>, component: &str) -> Res
     // Show available extensions count.
     let all = cabalist_ghc::extensions::load_extensions();
     let enabled_set: std::collections::HashSet<&str> = enabled.iter().copied().collect();
-    let available = all.iter().filter(|e| !enabled_set.contains(e.name.as_str())).count();
+    let available = all
+        .iter()
+        .filter(|e| !enabled_set.contains(e.name.as_str()))
+        .count();
     println!("\n{} available extensions not enabled.", available);
 
     Ok(ExitCode::SUCCESS)
@@ -93,17 +94,13 @@ fn toggle_extension(
                 correct
             );
         } else {
-            eprintln!(
-                "warning: '{}' is not a recognized GHC extension",
-                ext_name
-            );
+            eprintln!("warning: '{}' is not a recognized GHC extension", ext_name);
         }
     }
 
     let (keyword, name) = util::parse_component_spec(component);
-    let section_id = edit::find_section(cst, keyword, name).ok_or_else(|| {
-        anyhow::anyhow!("Component '{}' not found", component)
-    })?;
+    let section_id = edit::find_section(cst, keyword, name)
+        .ok_or_else(|| anyhow::anyhow!("Component '{}' not found", component))?;
 
     // Check if the extension is currently enabled.
     let is_enabled = ast

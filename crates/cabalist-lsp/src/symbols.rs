@@ -80,7 +80,11 @@ pub fn document_symbols(source: &str, line_index: &LineIndex) -> Vec<DocumentSym
 
         let (kind, name) = match comp {
             cabalist_parser::ast::Component::Library(lib) => {
-                let n = lib.fields.name.map(|s| format!("library {s}")).unwrap_or_else(|| "library".to_string());
+                let n = lib
+                    .fields
+                    .name
+                    .map(|s| format!("library {s}"))
+                    .unwrap_or_else(|| "library".to_string());
                 (SymbolKind::MODULE, n)
             }
             cabalist_parser::ast::Component::Executable(exe) => {

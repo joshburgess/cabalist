@@ -29,7 +29,9 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
 
     let keybindings = match app.current_view {
         View::Dashboard => " [d]eps  [e]xt  [b]uild  [m]eta  [p]roject  [i]nit  [?]help  [q]uit",
-        View::Dependencies => " [a]dd  [r]emove  [v]iew  [/]search  [Tab]component  [Esc]back  [?]help",
+        View::Dependencies => {
+            " [a]dd  [r]emove  [v]iew  [/]search  [Tab]component  [Esc]back  [?]help"
+        }
         View::Extensions => " [Space]toggle  [/]search  [i]nfo  [Tab]component  [Esc]back  [?]help",
         View::Build => " [b]uild  [t]est  [c]lean  [Esc]back  [?]help",
         View::Metadata => " [j/k]navigate  [Esc]back  [?]help",

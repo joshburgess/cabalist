@@ -87,7 +87,8 @@ fn ast_has_dependencies() {
 #[test]
 fn set_metadata_field_updates_ast() {
     let mut app = make_app();
-    app.set_metadata_field("synopsis", "Updated synopsis").unwrap();
+    app.set_metadata_field("synopsis", "Updated synopsis")
+        .unwrap();
     let ast = app.ast();
     assert_eq!(ast.synopsis, Some("Updated synopsis"));
 }
@@ -115,11 +116,15 @@ fn save_clears_dirty_flag() {
 fn reload_restores_from_disk() {
     let mut app = make_app();
     let original_synopsis = app.ast().synopsis.map(|s| s.to_string());
-    app.set_metadata_field("synopsis", "Temporary change").unwrap();
+    app.set_metadata_field("synopsis", "Temporary change")
+        .unwrap();
     app.save().unwrap();
     // Manually write original back to disk.
     let source = std::fs::read_to_string(&app.cabal_path).unwrap();
-    let reverted = source.replace("Temporary change", original_synopsis.as_deref().unwrap_or("A test package"));
+    let reverted = source.replace(
+        "Temporary change",
+        original_synopsis.as_deref().unwrap_or("A test package"),
+    );
     std::fs::write(&app.cabal_path, reverted).unwrap();
     app.reload().unwrap();
     assert!(!app.dirty);
@@ -204,7 +209,10 @@ fn toggle_extension_on() {
 
     let ast = app.ast();
     let lib = ast.library.as_ref().unwrap();
-    assert!(lib.fields.default_extensions.contains(&"DerivingStrategies"));
+    assert!(lib
+        .fields
+        .default_extensions
+        .contains(&"DerivingStrategies"));
 }
 
 // -- List length --

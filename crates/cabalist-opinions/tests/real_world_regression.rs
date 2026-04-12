@@ -189,8 +189,7 @@ fn add_remove_dep_round_trip_on_real_world_files() {
         };
 
         // Add a fake dependency.
-        let add_edits =
-            add_list_item(&result.cst, bd_field, "zzz-fake-test-dep ^>=99.0", false);
+        let add_edits = add_list_item(&result.cst, bd_field, "zzz-fake-test-dep ^>=99.0", false);
         if add_edits.is_empty() {
             continue;
         }
@@ -229,7 +228,10 @@ fn add_remove_dep_round_trip_on_real_world_files() {
         tested += 1;
     }
 
-    assert!(tested > 20, "should test at least 20 files, only tested {tested}");
+    assert!(
+        tested > 20,
+        "should test at least 20 files, only tested {tested}"
+    );
     assert!(
         failures.is_empty(),
         "Edit round-trip failures ({}/{tested}):\n{}",
@@ -325,9 +327,9 @@ fn conditional_deps_extracted_from_real_world_files() {
 fn files_with_conditionals_have_conditional_deps() {
     // Specific files known to have deps inside conditionals.
     let known_conditional_dep_files = [
-        "aeson.cabal",     // `if !impl(ghc >=9.0)` → integer-gmp
-        "lens.cabal",      // various `if flag(...)` deps
-        "text.cabal",      // `if impl(ghc >=...)` deps
+        "aeson.cabal", // `if !impl(ghc >=9.0)` → integer-gmp
+        "lens.cabal",  // various `if flag(...)` deps
+        "text.cabal",  // `if impl(ghc >=...)` deps
     ];
 
     let fixtures = all_fixture_sources();
@@ -341,9 +343,10 @@ fn files_with_conditionals_have_conditional_deps() {
         let ast = derive_ast(&result.cst);
 
         // Check that at least one component has non-empty conditionals.
-        let has_conditional = ast.all_components().iter().any(|c| {
-            !c.fields().conditionals.is_empty()
-        });
+        let has_conditional = ast
+            .all_components()
+            .iter()
+            .any(|c| !c.fields().conditionals.is_empty());
 
         assert!(
             has_conditional,

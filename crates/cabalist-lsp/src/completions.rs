@@ -259,11 +259,31 @@ fn package_completions(hackage: Option<&cabalist_hackage::HackageIndex>) -> Vec<
     // Full search happens as the user types (via trigger characters).
     // We show a curated set when the field is first entered.
     let popular = [
-        "base", "text", "bytestring", "containers", "aeson", "mtl",
-        "transformers", "vector", "unordered-containers", "hashable",
-        "filepath", "directory", "process", "time", "stm", "async",
-        "http-client", "http-types", "warp", "servant", "optparse-applicative",
-        "tasty", "hspec", "QuickCheck", "criterion",
+        "base",
+        "text",
+        "bytestring",
+        "containers",
+        "aeson",
+        "mtl",
+        "transformers",
+        "vector",
+        "unordered-containers",
+        "hashable",
+        "filepath",
+        "directory",
+        "process",
+        "time",
+        "stm",
+        "async",
+        "http-client",
+        "http-types",
+        "warp",
+        "servant",
+        "optparse-applicative",
+        "tasty",
+        "hspec",
+        "QuickCheck",
+        "criterion",
     ];
 
     popular
@@ -448,7 +468,9 @@ mod tests {
     fn context_detection_field_value_after_colon() {
         let source = "name: ";
         let ctx = detect_context(source, 6);
-        assert!(matches!(ctx, CompletionContext::FieldValue { field_name } if field_name == "name"));
+        assert!(
+            matches!(ctx, CompletionContext::FieldValue { field_name } if field_name == "name")
+        );
     }
 
     #[test]

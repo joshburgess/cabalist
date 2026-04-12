@@ -90,8 +90,19 @@ fn arb_multiline_field() -> impl Strategy<Value = String> {
     let continuations = prop::collection::vec(
         prop::collection::vec(
             prop::sample::select(vec![
-                "foo", "bar", "baz", "qux", "Data.Map", "base", ">=4.14",
-                "text", "aeson", "^>=2.2", "containers", "-Wall", "-Wcompat",
+                "foo",
+                "bar",
+                "baz",
+                "qux",
+                "Data.Map",
+                "base",
+                ">=4.14",
+                "text",
+                "aeson",
+                "^>=2.2",
+                "containers",
+                "-Wall",
+                "-Wcompat",
             ]),
             1..4,
         )
@@ -113,12 +124,8 @@ fn arb_multiline_field() -> impl Strategy<Value = String> {
 
 /// Generate a file containing a conditional block.
 fn arb_conditional_file() -> impl Strategy<Value = String> {
-    let flag_name =
-        "[a-z][a-z0-9]{0,8}".prop_filter("non-empty", |s| !s.is_empty());
-    let fields = prop::collection::vec(
-        arb_field_line().prop_map(|f| format!("    {f}")),
-        1..3,
-    );
+    let flag_name = "[a-z][a-z0-9]{0,8}".prop_filter("non-empty", |s| !s.is_empty());
+    let fields = prop::collection::vec(arb_field_line().prop_map(|f| format!("    {f}")), 1..3);
 
     (flag_name, fields).prop_map(|(flag, fields)| {
         let mut result = String::new();

@@ -84,7 +84,10 @@ library
   default-language: GHC2021
 ";
     let diags = validate_source(src);
-    assert!(has_diagnostic(&diags, "duplicate field: `default-language`"));
+    assert!(has_diagnostic(
+        &diags,
+        "duplicate field: `default-language`"
+    ));
 }
 
 #[test]
@@ -125,7 +128,10 @@ library
   default_language: GHC2021
 ";
     let diags = validate_source(src);
-    assert!(has_diagnostic(&diags, "duplicate field: `default-language`"));
+    assert!(has_diagnostic(
+        &diags,
+        "duplicate field: `default-language`"
+    ));
 }
 
 // ============================================================================
@@ -392,7 +398,10 @@ executable bar
         "missing required field: `cabal-version`"
     ));
     // Duplicate field in library.
-    assert!(has_diagnostic(&diags, "duplicate field: `default-language`"));
+    assert!(has_diagnostic(
+        &diags,
+        "duplicate field: `default-language`"
+    ));
     // Duplicate section.
     assert!(has_diagnostic(
         &diags,

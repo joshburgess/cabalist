@@ -33,7 +33,10 @@ impl LineIndex {
     /// Convert a byte offset to an LSP `Position`.
     pub fn offset_to_position(&self, offset: usize) -> Position {
         let offset = offset.min(self.source.len());
-        let line = self.line_starts.partition_point(|&start| start <= offset).saturating_sub(1);
+        let line = self
+            .line_starts
+            .partition_point(|&start| start <= offset)
+            .saturating_sub(1);
         let line_start = self.line_starts[line];
         // Count UTF-16 code units from line start to offset.
         let col_utf16: u32 = self.source[line_start..offset]
@@ -86,10 +89,34 @@ mod tests {
         let source = "hello\nworld\n";
         let idx = LineIndex::new(source);
 
-        assert_eq!(idx.offset_to_position(0), Position { line: 0, character: 0 });
-        assert_eq!(idx.offset_to_position(5), Position { line: 0, character: 5 });
-        assert_eq!(idx.offset_to_position(6), Position { line: 1, character: 0 });
-        assert_eq!(idx.offset_to_position(8), Position { line: 1, character: 2 });
+        assert_eq!(
+            idx.offset_to_position(0),
+            Position {
+                line: 0,
+                character: 0
+            }
+        );
+        assert_eq!(
+            idx.offset_to_position(5),
+            Position {
+                line: 0,
+                character: 5
+            }
+        );
+        assert_eq!(
+            idx.offset_to_position(6),
+            Position {
+                line: 1,
+                character: 0
+            }
+        );
+        assert_eq!(
+            idx.offset_to_position(8),
+            Position {
+                line: 1,
+                character: 2
+            }
+        );
     }
 
     #[test]
@@ -109,7 +136,13 @@ mod tests {
     #[test]
     fn empty_source() {
         let idx = LineIndex::new("");
-        assert_eq!(idx.offset_to_position(0), Position { line: 0, character: 0 });
+        assert_eq!(
+            idx.offset_to_position(0),
+            Position {
+                line: 0,
+                character: 0
+            }
+        );
     }
 
     #[test]
@@ -117,8 +150,20 @@ mod tests {
         let source = "name: foo\nversion: 0.1\n";
         let idx = LineIndex::new(source);
         let range = idx.span_to_range(Span::new(6, 9)); // "foo"
-        assert_eq!(range.start, Position { line: 0, character: 6 });
-        assert_eq!(range.end, Position { line: 0, character: 9 });
+        assert_eq!(
+            range.start,
+            Position {
+                line: 0,
+                character: 6
+            }
+        );
+        assert_eq!(
+            range.end,
+            Position {
+                line: 0,
+                character: 9
+            }
+        );
     }
 
     #[test]
@@ -126,8 +171,20 @@ mod tests {
         let source = "name: foo\nversion: 0.1\n";
         let idx = LineIndex::new(source);
         let range = idx.span_to_range(Span::new(0, 22)); // whole file
-        assert_eq!(range.start, Position { line: 0, character: 0 });
-        assert_eq!(range.end, Position { line: 1, character: 12 });
+        assert_eq!(
+            range.start,
+            Position {
+                line: 0,
+                character: 0
+            }
+        );
+        assert_eq!(
+            range.end,
+            Position {
+                line: 1,
+                character: 12
+            }
+        );
     }
 
     #[test]
@@ -135,6 +192,12 @@ mod tests {
         let source = "hi\n";
         let idx = LineIndex::new(source);
         let pos = idx.offset_to_position(100);
-        assert_eq!(pos, Position { line: 1, character: 0 });
+        assert_eq!(
+            pos,
+            Position {
+                line: 1,
+                character: 0
+            }
+        );
     }
 }

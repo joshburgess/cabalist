@@ -123,11 +123,21 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
 
                 let line = Line::from(vec![
                     Span::styled("  ", style),
-                    Span::styled(result.package.name.clone(), style.add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        result.package.name.clone(),
+                        style.add_modifier(Modifier::BOLD),
+                    ),
                     Span::styled("  ", style),
                     Span::styled(version_str, style),
                     Span::styled("  ", style),
-                    Span::styled(truncated_synopsis.to_string(), if is_selected { style } else { theme.muted_style() }),
+                    Span::styled(
+                        truncated_synopsis.to_string(),
+                        if is_selected {
+                            style
+                        } else {
+                            theme.muted_style()
+                        },
+                    ),
                 ]);
                 text.push(line);
             }

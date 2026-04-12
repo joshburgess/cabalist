@@ -11,15 +11,15 @@ use crate::convert::LineIndex;
 /// The semantic token types used by cabalist-lsp.
 /// Order must match [`LEGEND`].
 pub const TOKEN_TYPES: &[SemanticTokenType] = &[
-    SemanticTokenType::KEYWORD,    // 0: section keywords (library, executable, etc.)
-    SemanticTokenType::PROPERTY,   // 1: field names (build-depends, exposed-modules, etc.)
-    SemanticTokenType::STRING,     // 2: field values
-    SemanticTokenType::NUMBER,     // 3: version numbers
-    SemanticTokenType::OPERATOR,   // 4: version operators (^>=, >=, <, etc.)
-    SemanticTokenType::NAMESPACE,  // 5: package names in build-depends
+    SemanticTokenType::KEYWORD, // 0: section keywords (library, executable, etc.)
+    SemanticTokenType::PROPERTY, // 1: field names (build-depends, exposed-modules, etc.)
+    SemanticTokenType::STRING,  // 2: field values
+    SemanticTokenType::NUMBER,  // 3: version numbers
+    SemanticTokenType::OPERATOR, // 4: version operators (^>=, >=, <, etc.)
+    SemanticTokenType::NAMESPACE, // 5: package names in build-depends
     SemanticTokenType::ENUM_MEMBER, // 6: extension names, language names
-    SemanticTokenType::COMMENT,    // 7: comments
-    SemanticTokenType::VARIABLE,   // 8: flag/condition references
+    SemanticTokenType::COMMENT, // 7: comments
+    SemanticTokenType::VARIABLE, // 8: flag/condition references
 ];
 
 /// Build the semantic token legend.
@@ -65,8 +65,11 @@ pub fn semantic_tokens(source: &str, line_index: &LineIndex) -> Vec<SemanticToke
                     if let Some(name_start) = first_line.find(keyword).map(|i| i + keyword.len()) {
                         let rest = first_line[name_start..].trim();
                         if !rest.is_empty() {
-                            let name_col = start.character + name_start as u32
-                                + (first_line[name_start..].len() - first_line[name_start..].trim_start().len()) as u32;
+                            let name_col = start.character
+                                + name_start as u32
+                                + (first_line[name_start..].len()
+                                    - first_line[name_start..].trim_start().len())
+                                    as u32;
                             raw_tokens.push((start.line, name_col, rest.len() as u32, 2));
                         }
                     }
@@ -102,11 +105,7 @@ pub fn semantic_tokens(source: &str, line_index: &LineIndex) -> Vec<SemanticToke
 
     for (line, col, length, token_type) in raw_tokens {
         let delta_line = line - prev_line;
-        let delta_start = if delta_line == 0 {
-            col - prev_col
-        } else {
-            col
-        };
+        let delta_start = if delta_line == 0 { col - prev_col } else { col };
 
         tokens.push(SemanticToken {
             delta_line,

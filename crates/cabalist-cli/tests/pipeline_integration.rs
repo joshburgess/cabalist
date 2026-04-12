@@ -120,10 +120,9 @@ fn add_remove_roundtrip(source: &str, dep_str: &str, dep_name: &str) {
     let result = parse(source);
     let cst = &result.cst;
 
-    let section_id = edit::find_section(cst, "library", None)
-        .expect("should have library section");
-    let field_id = edit::find_field(cst, section_id, "build-depends")
-        .expect("should have build-depends");
+    let section_id = edit::find_section(cst, "library", None).expect("should have library section");
+    let field_id =
+        edit::find_field(cst, section_id, "build-depends").expect("should have build-depends");
 
     // Add the dependency.
     let edits = edit::add_list_item(cst, field_id, dep_str, true);
@@ -221,8 +220,7 @@ library
 
     let add_result = parse(&after_add);
     let section_id2 = edit::find_section(&add_result.cst, "library", None).unwrap();
-    let field_id2 =
-        edit::find_field(&add_result.cst, section_id2, "exposed-modules").unwrap();
+    let field_id2 = edit::find_field(&add_result.cst, section_id2, "exposed-modules").unwrap();
     let remove_edits = edit::remove_list_item(&add_result.cst, field_id2, "Lib.Extra");
     let mut batch2 = EditBatch::new();
     batch2.add_all(remove_edits);

@@ -7,9 +7,7 @@ use cabalist_lsp::state::DocumentState;
 type DocumentMap = Arc<RwLock<HashMap<String, DocumentState>>>;
 
 fn sample_cabal(name: &str) -> String {
-    format!(
-        "cabal-version: 3.0\nname: {name}\nversion: 0.1.0.0\nlicense: MIT\n"
-    )
+    format!("cabal-version: 3.0\nname: {name}\nversion: 0.1.0.0\nlicense: MIT\n")
 }
 
 fn make_docs() -> DocumentMap {

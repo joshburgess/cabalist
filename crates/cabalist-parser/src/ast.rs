@@ -159,19 +159,18 @@ impl VersionRange {
 pub fn version_satisfies(version: &Version, vr: &VersionRange) -> bool {
     use std::cmp::Ordering;
 
-    let cmp_versions =
-        |a: &Version, b: &Version| -> Ordering {
-            let max_len = a.components.len().max(b.components.len());
-            for i in 0..max_len {
-                let ac = a.components.get(i).copied().unwrap_or(0);
-                let bc = b.components.get(i).copied().unwrap_or(0);
-                match ac.cmp(&bc) {
-                    Ordering::Equal => continue,
-                    other => return other,
-                }
+    let cmp_versions = |a: &Version, b: &Version| -> Ordering {
+        let max_len = a.components.len().max(b.components.len());
+        for i in 0..max_len {
+            let ac = a.components.get(i).copied().unwrap_or(0);
+            let bc = b.components.get(i).copied().unwrap_or(0);
+            match ac.cmp(&bc) {
+                Ordering::Equal => continue,
+                other => return other,
             }
-            Ordering::Equal
-        };
+        }
+        Ordering::Equal
+    };
 
     match vr {
         VersionRange::Any => true,
@@ -195,12 +194,8 @@ pub fn version_satisfies(version: &Version, vr: &VersionRange) -> bool {
             }
             cmp_versions(version, &upper) == Ordering::Less
         }
-        VersionRange::And(a, b) => {
-            version_satisfies(version, a) && version_satisfies(version, b)
-        }
-        VersionRange::Or(a, b) => {
-            version_satisfies(version, a) || version_satisfies(version, b)
-        }
+        VersionRange::And(a, b) => version_satisfies(version, a) && version_satisfies(version, b),
+        VersionRange::Or(a, b) => version_satisfies(version, a) || version_satisfies(version, b),
     }
 }
 

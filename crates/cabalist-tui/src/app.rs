@@ -446,7 +446,12 @@ impl App {
             .cabal_path
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."));
-        self.lints = cabalist_opinions::lints::run_all_lints_with_cst(&ast, Some(&self.parse_result.cst), &lint_config, project_root);
+        self.lints = cabalist_opinions::lints::run_all_lints_with_cst(
+            &ast,
+            Some(&self.parse_result.cst),
+            &lint_config,
+            project_root,
+        );
     }
 
     /// Set a transient status message.
@@ -486,7 +491,11 @@ impl App {
                     self.set_status(&format!("Build {status}"));
 
                     // If the Hackage index was updated, reload it from cache.
-                    if self.build_output.iter().any(|l| l.contains("Index updated")) {
+                    if self
+                        .build_output
+                        .iter()
+                        .any(|l| l.contains("Index updated"))
+                    {
                         self.hackage_index = load_hackage_index_from_cache();
                     }
 
@@ -838,7 +847,11 @@ impl App {
                     for entry in map {
                         if cabalist_ghc::versions::version_gte(v, entry.ghc) {
                             match best {
-                                Some(prev) if cabalist_ghc::versions::version_gte(entry.ghc, prev.ghc) => best = Some(entry),
+                                Some(prev)
+                                    if cabalist_ghc::versions::version_gte(entry.ghc, prev.ghc) =>
+                                {
+                                    best = Some(entry)
+                                }
                                 None => best = Some(entry),
                                 _ => {}
                             }
@@ -846,7 +859,11 @@ impl App {
                     }
                     best.map(|e| {
                         let parts: Vec<&str> = e.base.split('.').collect();
-                        if parts.len() >= 2 { format!("{}.{}", parts[0], parts[1]) } else { e.base.to_string() }
+                        if parts.len() >= 2 {
+                            format!("{}.{}", parts[0], parts[1])
+                        } else {
+                            e.base.to_string()
+                        }
                     })
                 })
                 .unwrap_or_else(|| "4.20".to_string()),
@@ -1116,23 +1133,18 @@ impl App {
             match cabalist_hackage::client::update_index(&cache_dir).await {
                 Ok(index) => {
                     let count = index.len();
-                    let _ = tx.send(BuildEvent::Line(format!(
-                        "Index updated: {count} packages"
-                    )));
+                    let _ = tx.send(BuildEvent::Line(format!("Index updated: {count} packages")));
                     let _ = tx.send(BuildEvent::Complete {
                         success: true,
                         duration: std::time::Duration::ZERO,
                     });
                 }
                 Err(e) => {
-                    let _ = tx.send(BuildEvent::Error(format!(
-                        "Failed to update index: {e}"
-                    )));
+                    let _ = tx.send(BuildEvent::Error(format!("Failed to update index: {e}")));
                 }
             }
         });
     }
-
 
     /// Format the .cabal file (round-trip through parser, optional sort).
     pub fn format_file(&mut self) -> Result<(), String> {
@@ -1365,9 +1377,8 @@ fn set_project_field_in_source(source: &str, field_name: &str, value: &str) -> S
     for line in &lines {
         if skip_continuation {
             // Continuation lines are indented (start with whitespace) and non-empty.
-            let is_continuation = !line.is_empty()
-                && line.starts_with([' ', '\t'])
-                && !line.trim().is_empty();
+            let is_continuation =
+                !line.is_empty() && line.starts_with([' ', '\t']) && !line.trim().is_empty();
             if is_continuation {
                 continue; // Skip this continuation line.
             }

@@ -239,7 +239,12 @@ fn resolve_span(cst: Option<&CabalCst>, node: NodeId) -> Span {
 // ---------------------------------------------------------------------------
 
 /// `missing-upper-bound`: Dependency has no upper version bound.
-fn lint_missing_upper_bound(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
+fn lint_missing_upper_bound(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    resolve: &impl Fn(NodeId) -> Span,
+    lints: &mut Vec<Lint>,
+) {
     const ID: &str = "missing-upper-bound";
     if !config.is_enabled(ID) {
         return;
@@ -277,7 +282,12 @@ fn lint_missing_upper_bound(file: &CabalFile<'_>, config: &LintConfig, resolve: 
 }
 
 /// `missing-lower-bound`: Dependency has no lower version bound.
-fn lint_missing_lower_bound(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
+fn lint_missing_lower_bound(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    resolve: &impl Fn(NodeId) -> Span,
+    lints: &mut Vec<Lint>,
+) {
     const ID: &str = "missing-lower-bound";
     if !config.is_enabled(ID) {
         return;
@@ -314,7 +324,12 @@ fn lint_missing_lower_bound(file: &CabalFile<'_>, config: &LintConfig, resolve: 
 }
 
 /// `wide-any-version`: Dependency uses `>=0` or no constraint at all.
-fn lint_wide_any_version(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
+fn lint_wide_any_version(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    resolve: &impl Fn(NodeId) -> Span,
+    lints: &mut Vec<Lint>,
+) {
     const ID: &str = "wide-any-version";
     if !config.is_enabled(ID) {
         return;
@@ -426,7 +441,12 @@ fn lint_missing_bug_reports(file: &CabalFile<'_>, config: &LintConfig, lints: &m
 /// `-Werror` is fine in a conditional block (like `if flag(ci)`) but should
 /// not appear as a top-level option because it breaks downstream builds when
 /// new GHC warnings are added.
-fn lint_ghc_options_werror(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
+fn lint_ghc_options_werror(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    resolve: &impl Fn(NodeId) -> Span,
+    lints: &mut Vec<Lint>,
+) {
     const ID: &str = "ghc-options-werror";
     if !config.is_enabled(ID) {
         return;
@@ -482,7 +502,12 @@ fn lint_ghc_options_werror(file: &CabalFile<'_>, config: &LintConfig, resolve: &
 }
 
 /// `missing-default-language`: Component has no `default-language`.
-fn lint_missing_default_language(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
+fn lint_missing_default_language(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    resolve: &impl Fn(NodeId) -> Span,
+    lints: &mut Vec<Lint>,
+) {
     const ID: &str = "missing-default-language";
     if !config.is_enabled(ID) {
         return;
@@ -526,7 +551,12 @@ fn lint_missing_default_language(file: &CabalFile<'_>, config: &LintConfig, reso
 }
 
 /// `cabal-version-low`: `cabal-version < 3.0` — suggest upgrading.
-fn lint_cabal_version_low(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
+fn lint_cabal_version_low(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    resolve: &impl Fn(NodeId) -> Span,
+    lints: &mut Vec<Lint>,
+) {
     const ID: &str = "cabal-version-low";
     if !config.is_enabled(ID) {
         return;
@@ -556,7 +586,12 @@ fn lint_cabal_version_low(file: &CabalFile<'_>, config: &LintConfig, resolve: &i
 }
 
 /// `duplicate-dep`: Same package appears in `build-depends` more than once.
-fn lint_duplicate_dep(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
+fn lint_duplicate_dep(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    resolve: &impl Fn(NodeId) -> Span,
+    lints: &mut Vec<Lint>,
+) {
     const ID: &str = "duplicate-dep";
     if !config.is_enabled(ID) {
         return;
@@ -608,7 +643,12 @@ fn lint_duplicate_dep(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl 
 }
 
 /// `unused-flag`: A `flag` section exists but is never referenced in conditions.
-fn lint_unused_flag(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
+fn lint_unused_flag(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    resolve: &impl Fn(NodeId) -> Span,
+    lints: &mut Vec<Lint>,
+) {
     const ID: &str = "unused-flag";
     if !config.is_enabled(ID) {
         return;
@@ -671,7 +711,12 @@ fn lint_unused_flag(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn
 
 /// `no-common-stanza`: Multiple sections share ≥5 identical field names,
 /// suggesting the common parts should be extracted into a `common` stanza.
-fn lint_no_common_stanza(file: &CabalFile<'_>, config: &LintConfig, _resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
+fn lint_no_common_stanza(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    _resolve: &impl Fn(NodeId) -> Span,
+    lints: &mut Vec<Lint>,
+) {
     const ID: &str = "no-common-stanza";
     if !config.is_enabled(ID) {
         return;
@@ -758,7 +803,12 @@ fn lint_no_common_stanza(file: &CabalFile<'_>, config: &LintConfig, _resolve: &i
 }
 
 /// `exposed-no-modules`: Library with empty or missing `exposed-modules`.
-fn lint_exposed_no_modules(file: &CabalFile<'_>, config: &LintConfig, resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
+fn lint_exposed_no_modules(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    resolve: &impl Fn(NodeId) -> Span,
+    lints: &mut Vec<Lint>,
+) {
     const ID: &str = "exposed-no-modules";
     if !config.is_enabled(ID) {
         return;
@@ -799,7 +849,12 @@ fn lint_exposed_no_modules(file: &CabalFile<'_>, config: &LintConfig, resolve: &
 
 /// `stale-tested-with`: `tested-with` lists a GHC version more than 2 major
 /// releases old.
-fn lint_stale_tested_with(file: &CabalFile<'_>, config: &LintConfig, _resolve: &impl Fn(NodeId) -> Span, lints: &mut Vec<Lint>) {
+fn lint_stale_tested_with(
+    file: &CabalFile<'_>,
+    config: &LintConfig,
+    _resolve: &impl Fn(NodeId) -> Span,
+    lints: &mut Vec<Lint>,
+) {
     const ID: &str = "stale-tested-with";
     if !config.is_enabled(ID) {
         return;
@@ -891,65 +946,64 @@ fn lint_string_gaps(
     let severity = config.effective_severity(ID, Severity::Info);
 
     // Helper: check a component's source dirs and modules.
-    let check_component =
-        |fields: &ComponentFields<'_>,
-         exposed_modules: &[&str],
-         desc: &str,
-         lints: &mut Vec<Lint>| {
-            let source_dirs: Vec<&str> = if fields.hs_source_dirs.is_empty() {
-                vec!["."]
-            } else {
-                fields.hs_source_dirs.to_vec()
-            };
-
-            // Check that source directories exist.
-            for dir in &source_dirs {
-                let full_path = project_root.join(dir);
-                if !full_path.is_dir() {
-                    lints.push(Lint {
-                        id: ID,
-                        severity,
-                        message: format!(
-                            "{desc} lists hs-source-dirs entry '{dir}' \
-                             which does not exist on disk."
-                        ),
-                        span: resolve(fields.cst_node),
-                        suggestion: Some(format!("Create the '{dir}' directory or fix the path")),
-                    });
-                }
-            }
-
-            // Check that modules correspond to files.
-            let all_modules: Vec<&str> = exposed_modules
-                .iter()
-                .copied()
-                .chain(fields.other_modules.iter().copied())
-                .collect();
-
-            for module in &all_modules {
-                // Convert module name to relative path: Data.Map → Data/Map.hs
-                let rel_path = module.replace('.', "/");
-                let found = source_dirs.iter().any(|dir| {
-                    let base = project_root.join(dir).join(&rel_path);
-                    base.with_extension("hs").is_file() || base.with_extension("lhs").is_file()
-                });
-                if !found {
-                    lints.push(Lint {
-                        id: ID,
-                        severity,
-                        message: format!(
-                            "{desc} lists module '{module}' but no corresponding \
-                             .hs or .lhs file was found in any source directory."
-                        ),
-                        span: resolve(fields.cst_node),
-                        suggestion: Some(format!(
-                            "Create '{}.hs' or remove '{module}' from the module list",
-                            rel_path
-                        )),
-                    });
-                }
-            }
+    let check_component = |fields: &ComponentFields<'_>,
+                           exposed_modules: &[&str],
+                           desc: &str,
+                           lints: &mut Vec<Lint>| {
+        let source_dirs: Vec<&str> = if fields.hs_source_dirs.is_empty() {
+            vec!["."]
+        } else {
+            fields.hs_source_dirs.to_vec()
         };
+
+        // Check that source directories exist.
+        for dir in &source_dirs {
+            let full_path = project_root.join(dir);
+            if !full_path.is_dir() {
+                lints.push(Lint {
+                    id: ID,
+                    severity,
+                    message: format!(
+                        "{desc} lists hs-source-dirs entry '{dir}' \
+                             which does not exist on disk."
+                    ),
+                    span: resolve(fields.cst_node),
+                    suggestion: Some(format!("Create the '{dir}' directory or fix the path")),
+                });
+            }
+        }
+
+        // Check that modules correspond to files.
+        let all_modules: Vec<&str> = exposed_modules
+            .iter()
+            .copied()
+            .chain(fields.other_modules.iter().copied())
+            .collect();
+
+        for module in &all_modules {
+            // Convert module name to relative path: Data.Map → Data/Map.hs
+            let rel_path = module.replace('.', "/");
+            let found = source_dirs.iter().any(|dir| {
+                let base = project_root.join(dir).join(&rel_path);
+                base.with_extension("hs").is_file() || base.with_extension("lhs").is_file()
+            });
+            if !found {
+                lints.push(Lint {
+                    id: ID,
+                    severity,
+                    message: format!(
+                        "{desc} lists module '{module}' but no corresponding \
+                             .hs or .lhs file was found in any source directory."
+                    ),
+                    span: resolve(fields.cst_node),
+                    suggestion: Some(format!(
+                        "Create '{}.hs' or remove '{module}' from the module list",
+                        rel_path
+                    )),
+                });
+            }
+        }
+    };
 
     if let Some(ref lib) = file.library {
         check_component(&lib.fields, &lib.exposed_modules, "Library", lints);
@@ -1176,7 +1230,10 @@ test-suite my-tests
                 );
             }
         }
-        assert!(!ids.contains(&"wide-any-version") || !lints.iter().any(|l| l.message.contains("my-lib")));
+        assert!(
+            !ids.contains(&"wide-any-version")
+                || !lints.iter().any(|l| l.message.contains("my-lib"))
+        );
     }
 
     #[test]

@@ -81,12 +81,7 @@ impl LanguageServer for Backend {
                     },
                 )),
                 completion_provider: Some(CompletionOptions {
-                    trigger_characters: Some(vec![
-                        ":".into(),
-                        " ".into(),
-                        "-".into(),
-                        ",".into(),
-                    ]),
+                    trigger_characters: Some(vec![":".into(), " ".into(), "-".into(), ",".into()]),
                     ..Default::default()
                 }),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
@@ -175,15 +170,10 @@ impl LanguageServer for Backend {
         let mut docs = self.documents.write().await;
         docs.remove(&uri);
 
-        self.client
-            .publish_diagnostics(uri, Vec::new(), None)
-            .await;
+        self.client.publish_diagnostics(uri, Vec::new(), None).await;
     }
 
-    async fn completion(
-        &self,
-        params: CompletionParams,
-    ) -> Result<Option<CompletionResponse>> {
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
 
@@ -226,13 +216,14 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
 
-        Ok(crate::rename::prepare_rename(&doc.source, &doc.line_index, position))
+        Ok(crate::rename::prepare_rename(
+            &doc.source,
+            &doc.line_index,
+            position,
+        ))
     }
 
-    async fn rename(
-        &self,
-        params: RenameParams,
-    ) -> Result<Option<WorkspaceEdit>> {
+    async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
 
@@ -262,8 +253,7 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
 
-        let result =
-            crate::definition::goto_definition(&doc.source, &doc.line_index, position);
+        let result = crate::definition::goto_definition(&doc.source, &doc.line_index, position);
         match result {
             Some(mut loc) => {
                 loc.uri = uri; // Replace placeholder with actual document URI.
@@ -273,10 +263,7 @@ impl LanguageServer for Backend {
         }
     }
 
-    async fn code_action(
-        &self,
-        params: CodeActionParams,
-    ) -> Result<Option<CodeActionResponse>> {
+    async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
         let uri = params.text_document.uri;
 
         let docs = self.documents.read().await;
@@ -309,10 +296,7 @@ impl LanguageServer for Backend {
         Ok(Some(DocumentSymbolResponse::Nested(symbols)))
     }
 
-    async fn inlay_hint(
-        &self,
-        params: InlayHintParams,
-    ) -> Result<Option<Vec<InlayHint>>> {
+    async fn inlay_hint(&self, params: InlayHintParams) -> Result<Option<Vec<InlayHint>>> {
         let uri = params.text_document.uri;
 
         let docs = self.documents.read().await;
@@ -341,18 +325,14 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
 
-        let tokens =
-            crate::semantic_tokens::semantic_tokens(&doc.source, &doc.line_index);
+        let tokens = crate::semantic_tokens::semantic_tokens(&doc.source, &doc.line_index);
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
             data: tokens,
         })))
     }
 
-    async fn formatting(
-        &self,
-        params: DocumentFormattingParams,
-    ) -> Result<Option<Vec<TextEdit>>> {
+    async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {
         let uri = params.text_document.uri;
 
         let docs = self.documents.read().await;

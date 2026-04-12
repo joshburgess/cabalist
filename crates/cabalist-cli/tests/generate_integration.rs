@@ -15,8 +15,14 @@ fn completions_bash_produces_output() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("cabalist-cli"), "should contain command name");
-    assert!(stdout.contains("complete"), "should contain bash completion directives");
+    assert!(
+        stdout.contains("cabalist-cli"),
+        "should contain command name"
+    );
+    assert!(
+        stdout.contains("complete"),
+        "should contain bash completion directives"
+    );
 }
 
 #[test]
@@ -60,7 +66,11 @@ fn manpages_generates_files() {
         .filter_map(|e| e.ok())
         .collect();
 
-    assert!(entries.len() > 10, "should generate many man pages, got {}", entries.len());
+    assert!(
+        entries.len() > 10,
+        "should generate many man pages, got {}",
+        entries.len()
+    );
 
     // Main page must exist.
     assert!(dir.path().join("cabalist-cli.1").exists());

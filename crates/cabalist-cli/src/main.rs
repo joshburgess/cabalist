@@ -201,7 +201,7 @@ fn main() -> ExitCode {
                 .map_err(|e| anyhow::anyhow!("failed to generate man pages: {e}"))?;
             eprintln!("Man pages written to {}", dir.display());
             Ok(ExitCode::SUCCESS)
-        })()
+        })(),
     };
 
     match result {

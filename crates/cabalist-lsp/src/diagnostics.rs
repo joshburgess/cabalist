@@ -1,7 +1,7 @@
 //! Diagnostic conversion: parser, validation, and opinion diagnostics → LSP format.
 
-use cabalist_parser::diagnostic::{Diagnostic, Severity};
 use cabalist_opinions::Lint;
+use cabalist_parser::diagnostic::{Diagnostic, Severity};
 use tower_lsp::lsp_types::{self, DiagnosticSeverity, NumberOrString};
 
 use crate::convert::LineIndex;
@@ -57,12 +57,10 @@ fn extract_lint_data(lint: &Lint) -> Option<serde_json::Value> {
             // Extract the package name from: "Dependency 'pkg' ..."
             let pkg = extract_quoted(&lint.message);
             // Extract version info from: "... (>=X.Y)" or "(^>=X.Y)"
-            let version = lint.message
-                .find('(')
-                .and_then(|start| {
-                    let rest = &lint.message[start + 1..];
-                    rest.find(')').map(|end| rest[..end].trim().to_string())
-                });
+            let version = lint.message.find('(').and_then(|start| {
+                let rest = &lint.message[start + 1..];
+                rest.find(')').map(|end| rest[..end].trim().to_string())
+            });
 
             let mut map = serde_json::Map::new();
             if let Some(p) = pkg {
@@ -113,7 +111,12 @@ pub fn compute_diagnostics(
     let ast = cabalist_parser::ast::derive_ast(&result.cst);
     let config = cabalist_opinions::config::find_and_load_config(project_root);
     let lint_config = config.lints.to_lint_config();
-    let lints = cabalist_opinions::run_all_lints_with_cst(&ast, Some(&result.cst), &lint_config, project_root);
+    let lints = cabalist_opinions::run_all_lints_with_cst(
+        &ast,
+        Some(&result.cst),
+        &lint_config,
+        project_root,
+    );
     for lint in &lints {
         lsp_diags.push(lint_to_lsp(lint, line_index));
     }
@@ -176,6 +179,9 @@ mod tests {
             .iter()
             .filter(|d| d.severity == Some(DiagnosticSeverity::ERROR))
             .collect();
-        assert!(errors.is_empty(), "minimal valid file should have no errors");
+        assert!(
+            errors.is_empty(),
+            "minimal valid file should have no errors"
+        );
     }
 }

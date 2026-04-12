@@ -16,8 +16,7 @@ pub fn sort_list_field(source: &str, field_name: &str) -> String {
     let mut current = source.to_string();
 
     for key in &section_keys {
-        let Some((result, _section_id, field_id)) =
-            find_section_field(&current, key, field_name)
+        let Some((result, _section_id, field_id)) = find_section_field(&current, key, field_name)
         else {
             continue;
         };
@@ -39,8 +38,7 @@ pub fn sort_list_field(source: &str, field_name: &str) -> String {
 
         // Remove items in reverse order, re-parsing between each removal.
         for item in items.iter().rev() {
-            let Some((re_result, _, re_field)) =
-                find_section_field(&current, key, field_name)
+            let Some((re_result, _, re_field)) = find_section_field(&current, key, field_name)
             else {
                 break;
             };
@@ -55,8 +53,7 @@ pub fn sort_list_field(source: &str, field_name: &str) -> String {
 
         // Re-add items in sorted order, preserving the original layout style.
         for item in &sorted {
-            let Some((re_result, _, re_field)) =
-                find_section_field(&current, key, field_name)
+            let Some((re_result, _, re_field)) = find_section_field(&current, key, field_name)
             else {
                 break;
             };
@@ -145,7 +142,11 @@ pub fn extract_list_items(
         let child = &cst.nodes[child_id.0];
         if matches!(child.kind, CstNodeKind::ValueLine) {
             let text = &cst.source[child.span.start..child.span.end];
-            let text = text.trim().trim_start_matches(',').trim_end_matches(',').trim();
+            let text = text
+                .trim()
+                .trim_start_matches(',')
+                .trim_end_matches(',')
+                .trim();
             if !text.is_empty() {
                 items.push(text.to_string());
             }

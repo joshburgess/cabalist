@@ -108,9 +108,8 @@ fn action_for_lint(
             let insert_pos = find_top_level_insert_position(&doc.source, &doc.line_index);
             let repo_url = extract_homepage(&doc.source)
                 .unwrap_or_else(|| "https://github.com/OWNER/REPO".to_string());
-            let text = format!(
-                "\nsource-repository head\n  type: git\n  location: {repo_url}.git\n"
-            );
+            let text =
+                format!("\nsource-repository head\n  type: git\n  location: {repo_url}.git\n");
             Some(make_edit_action(
                 "Add `source-repository` section",
                 uri,
@@ -130,13 +129,15 @@ fn action_for_lint(
                 .and_then(|c| c.strip_prefix(">="))
                 .map(|v| v.trim().to_string());
 
-            lower_version.map(|version| make_replace_action(
+            lower_version.map(|version| {
+                make_replace_action(
                     &format!("Add PVP upper bound: ^>={version}"),
                     uri,
                     diag.range,
                     &format!("{pkg_name} ^>={version}"),
                     diag,
-                ))
+                )
+            })
         }
         "duplicate-dep" => {
             // The diagnostic range points to the duplicate dependency line.
@@ -168,13 +169,15 @@ fn action_for_lint(
                 .and_then(|c| c.strip_prefix("<"))
                 .map(|v| v.trim().to_string());
 
-            upper_version.map(|version| make_replace_action(
+            upper_version.map(|version| {
+                make_replace_action(
                     &format!("Add PVP bounds: ^>={version}"),
                     uri,
                     diag.range,
                     &format!("{pkg_name} ^>={version}"),
                     diag,
-                ))
+                )
+            })
         }
         "wide-any-version" => {
             let (pkg_name, _) = extract_dep_data(diag);
@@ -282,20 +285,24 @@ fn action_for_lint(
 fn extract_dep_data(diag: &Diagnostic) -> (Option<String>, Option<String>) {
     // Try structured data first.
     if let Some(ref data) = diag.data {
-        let pkg = data.get("package").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let constraint = data.get("constraint").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let pkg = data
+            .get("package")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let constraint = data
+            .get("constraint")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
         if pkg.is_some() {
             return (pkg, constraint);
         }
     }
     // Fall back to message parsing.
     let pkg = extract_quoted_name(&diag.message);
-    let constraint = diag.message
-        .find('(')
-        .and_then(|start| {
-            let rest = &diag.message[start + 1..];
-            rest.find(')').map(|end| rest[..end].trim().to_string())
-        });
+    let constraint = diag.message.find('(').and_then(|start| {
+        let rest = &diag.message[start + 1..];
+        rest.find(')').map(|end| rest[..end].trim().to_string())
+    });
     (pkg, constraint)
 }
 
@@ -415,8 +422,14 @@ fn has_action_for_lint(lint_id: &str) -> bool {
 
     let diag = Diagnostic {
         range: Range {
-            start: Position { line: 0, character: 0 },
-            end: Position { line: 0, character: 10 },
+            start: Position {
+                line: 0,
+                character: 0,
+            },
+            end: Position {
+                line: 0,
+                character: 10,
+            },
         },
         severity: Some(DiagnosticSeverity::WARNING),
         source: Some("cabalist".into()),
@@ -507,7 +520,8 @@ mod tests {
             message: "test".into(),
             ..Default::default()
         };
-        let action = action_for_lint(&doc, &uri, Path::new("."), &diag, "missing-synopsis").unwrap();
+        let action =
+            action_for_lint(&doc, &uri, Path::new("."), &diag, "missing-synopsis").unwrap();
         let edit = action.edit.unwrap();
         let changes = edit.changes.unwrap();
         let edits = changes.get(&uri).unwrap();
@@ -530,7 +544,8 @@ mod tests {
             message: "test".into(),
             ..Default::default()
         };
-        let action = action_for_lint(&doc, &uri, Path::new("."), &diag, "missing-description").unwrap();
+        let action =
+            action_for_lint(&doc, &uri, Path::new("."), &diag, "missing-description").unwrap();
         let edit = action.edit.unwrap();
         let changes = edit.changes.unwrap();
         let edits = changes.get(&uri).unwrap();
@@ -547,12 +562,20 @@ mod tests {
         let uri = Url::parse("file:///test.cabal").unwrap();
         let diag = Diagnostic {
             range: Range {
-                start: Position { line: 7, character: 17 },
-                end: Position { line: 7, character: 29 },
+                start: Position {
+                    line: 7,
+                    character: 17,
+                },
+                end: Position {
+                    line: 7,
+                    character: 29,
+                },
             },
             source: Some("cabalist".into()),
             code: Some(NumberOrString::String("missing-upper-bound".into())),
-            message: "Dependency 'base' has no upper version bound (>=4.17). This violates the PVP.".into(),
+            message:
+                "Dependency 'base' has no upper version bound (>=4.17). This violates the PVP."
+                    .into(),
             ..Default::default()
         };
         let action = action_for_lint(&doc, &uri, Path::new("."), &diag, "missing-upper-bound");
@@ -561,7 +584,11 @@ mod tests {
         let edit = action.edit.unwrap();
         let changes = edit.changes.unwrap();
         let edits = changes.get(&uri).unwrap();
-        assert!(edits[0].new_text.contains("^>=4.17"), "should add PVP bound, got: {}", edits[0].new_text);
+        assert!(
+            edits[0].new_text.contains("^>=4.17"),
+            "should add PVP bound, got: {}",
+            edits[0].new_text
+        );
     }
 
     #[test]
@@ -581,12 +608,15 @@ mod tests {
             message: "test".into(),
             ..Default::default()
         };
-        let action = action_for_lint(&doc, &uri, Path::new("."), &diag, "missing-bug-reports").unwrap();
+        let action =
+            action_for_lint(&doc, &uri, Path::new("."), &diag, "missing-bug-reports").unwrap();
         let edit = action.edit.unwrap();
         let changes = edit.changes.unwrap();
         let edits = changes.get(&uri).unwrap();
         assert!(
-            edits[0].new_text.contains("https://github.com/user/repo/issues"),
+            edits[0]
+                .new_text
+                .contains("https://github.com/user/repo/issues"),
             "bug-reports should derive from homepage, got: {}",
             edits[0].new_text
         );
@@ -623,8 +653,14 @@ mod tests {
 
         let diag = Diagnostic {
             range: Range {
-                start: Position { line: 0, character: 0 },
-                end: Position { line: 0, character: 18 },
+                start: Position {
+                    line: 0,
+                    character: 0,
+                },
+                end: Position {
+                    line: 0,
+                    character: 18,
+                },
             },
             source: Some("cabalist".into()),
             code: Some(NumberOrString::String("cabal-version-low".into())),
