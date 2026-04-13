@@ -32,7 +32,7 @@ struct WarningsFile {
     warning: Vec<Warning>,
 }
 
-const WARNINGS_TOML: &str = include_str!("../../../data/ghc-warnings.toml");
+const WARNINGS_TOML: &str = include_str!("../data/ghc-warnings.toml");
 
 static WARNINGS: Lazy<Vec<Warning>> = Lazy::new(|| {
     let file: WarningsFile =

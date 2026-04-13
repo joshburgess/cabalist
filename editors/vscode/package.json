@@ -2,7 +2,7 @@
   "name": "cabalist",
   "displayName": "Cabalist - Haskell .cabal Support",
   "description": "Language support for Haskell .cabal files powered by cabalist — syntax highlighting, completions, diagnostics, and quick fixes",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "cabalist",
   "license": "MIT OR Apache-2.0",
   "repository": {

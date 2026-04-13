@@ -33,7 +33,7 @@ struct ExtensionsFile {
     extension: Vec<Extension>,
 }
 
-const EXTENSIONS_TOML: &str = include_str!("../../../data/ghc-extensions.toml");
+const EXTENSIONS_TOML: &str = include_str!("../data/ghc-extensions.toml");
 
 static EXTENSIONS: Lazy<Vec<Extension>> = Lazy::new(|| {
     let file: ExtensionsFile =

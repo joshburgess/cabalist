@@ -114,10 +114,10 @@ impl Default for TemplateVars {
 }
 
 // Embedded template sources.
-const LIBRARY_TEMPLATE: &str = include_str!("../../../data/templates/library.cabal.tmpl");
-const APPLICATION_TEMPLATE: &str = include_str!("../../../data/templates/application.cabal.tmpl");
-const LIB_AND_EXE_TEMPLATE: &str = include_str!("../../../data/templates/lib-and-exe.cabal.tmpl");
-const FULL_TEMPLATE: &str = include_str!("../../../data/templates/full.cabal.tmpl");
+const LIBRARY_TEMPLATE: &str = include_str!("../data/templates/library.cabal.tmpl");
+const APPLICATION_TEMPLATE: &str = include_str!("../data/templates/application.cabal.tmpl");
+const LIB_AND_EXE_TEMPLATE: &str = include_str!("../data/templates/lib-and-exe.cabal.tmpl");
+const FULL_TEMPLATE: &str = include_str!("../data/templates/full.cabal.tmpl");
 
 /// Get the raw template string for a given template kind.
 pub fn raw_template(kind: TemplateKind) -> &'static str {

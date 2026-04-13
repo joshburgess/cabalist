@@ -33,7 +33,7 @@ struct RecommendedDepsFile {
     category: BTreeMap<String, PackageCategory>,
 }
 
-const RECOMMENDED_DEPS_TOML: &str = include_str!("../../../data/recommended-deps.toml");
+const RECOMMENDED_DEPS_TOML: &str = include_str!("../data/recommended-deps.toml");
 
 static RECOMMENDED: Lazy<BTreeMap<String, PackageCategory>> = Lazy::new(|| {
     let file: RecommendedDepsFile = toml::from_str(RECOMMENDED_DEPS_TOML)
