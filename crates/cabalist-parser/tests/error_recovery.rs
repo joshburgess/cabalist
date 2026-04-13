@@ -159,6 +159,32 @@ fn malformed_conditional_recovery() {
 }
 
 #[test]
+fn stray_operator_in_conditional_no_hang() {
+    // Regression: the condition-expression lexer used to loop forever on
+    // `if` followed by a stray `&`, `|`, or `=` because those bytes were
+    // guarded for their doubled forms (`&&`, `||`, `==`) but excluded from
+    // the word scanner, so `pos` never advanced.
+    for source in [
+        "if&",
+        "if|",
+        "if=",
+        "if &\n",
+        "if |\n",
+        "if =x\n",
+        "elif&",
+        "library\n  if &\n    ghc-options: -Wall\n",
+    ] {
+        let result = parse(source);
+        // Must round-trip even when the input is malformed.
+        assert_eq!(
+            result.cst.render(),
+            source,
+            "Stray operator should round-trip: {source:?}"
+        );
+    }
+}
+
+#[test]
 fn duplicate_sections_parsed() {
     let source = "library\n  exposed-modules: Foo\n\nlibrary\n  exposed-modules: Bar\n";
     let result = parse(source);

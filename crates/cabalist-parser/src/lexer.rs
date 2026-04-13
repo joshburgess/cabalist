@@ -691,23 +691,44 @@ fn tokenize_condition_expr(
                 });
                 pos += 1;
             }
-            b'&' if pos + 1 < end && bytes[pos + 1] == b'&' => {
-                tokens.push(Token {
-                    kind: TokenKind::And,
-                    span: Span::new(pos, pos + 2),
-                    indent: visual_column(bytes, line.start, pos),
-                    leading_trivia: std::mem::take(pending_trivia),
-                });
-                pos += 2;
+            b'&' => {
+                if pos + 1 < end && bytes[pos + 1] == b'&' {
+                    tokens.push(Token {
+                        kind: TokenKind::And,
+                        span: Span::new(pos, pos + 2),
+                        indent: visual_column(bytes, line.start, pos),
+                        leading_trivia: std::mem::take(pending_trivia),
+                    });
+                    pos += 2;
+                } else {
+                    // Stray `&` (not `&&`) — emit as single-char Value for error recovery.
+                    tokens.push(Token {
+                        kind: TokenKind::Value,
+                        span: Span::new(pos, pos + 1),
+                        indent: visual_column(bytes, line.start, pos),
+                        leading_trivia: std::mem::take(pending_trivia),
+                    });
+                    pos += 1;
+                }
             }
-            b'|' if pos + 1 < end && bytes[pos + 1] == b'|' => {
-                tokens.push(Token {
-                    kind: TokenKind::Or,
-                    span: Span::new(pos, pos + 2),
-                    indent: visual_column(bytes, line.start, pos),
-                    leading_trivia: std::mem::take(pending_trivia),
-                });
-                pos += 2;
+            b'|' => {
+                if pos + 1 < end && bytes[pos + 1] == b'|' {
+                    tokens.push(Token {
+                        kind: TokenKind::Or,
+                        span: Span::new(pos, pos + 2),
+                        indent: visual_column(bytes, line.start, pos),
+                        leading_trivia: std::mem::take(pending_trivia),
+                    });
+                    pos += 2;
+                } else {
+                    tokens.push(Token {
+                        kind: TokenKind::Value,
+                        span: Span::new(pos, pos + 1),
+                        indent: visual_column(bytes, line.start, pos),
+                        leading_trivia: std::mem::take(pending_trivia),
+                    });
+                    pos += 1;
+                }
             }
             b'>' if pos + 1 < end && bytes[pos + 1] == b'=' => {
                 tokens.push(Token {
@@ -727,14 +748,19 @@ fn tokenize_condition_expr(
                 });
                 pos += 2;
             }
-            b'=' if pos + 1 < end && bytes[pos + 1] == b'=' => {
+            b'=' => {
+                let len = if pos + 1 < end && bytes[pos + 1] == b'=' {
+                    2
+                } else {
+                    1
+                };
                 tokens.push(Token {
                     kind: TokenKind::CompOp,
-                    span: Span::new(pos, pos + 2),
+                    span: Span::new(pos, pos + len),
                     indent: visual_column(bytes, line.start, pos),
                     leading_trivia: std::mem::take(pending_trivia),
                 });
-                pos += 2;
+                pos += len;
             }
             b'>' => {
                 tokens.push(Token {
@@ -772,8 +798,11 @@ fn tokenize_condition_expr(
                 pos = end;
             }
             _ => {
-                // An identifier or version number — emit as Value.
+                // An identifier or version number — emit as Value. Always
+                // consume at least one byte to guarantee forward progress
+                // on inputs containing stray operator chars.
                 let val_start = pos;
+                pos += 1;
                 while pos < end
                     && !matches!(
                         bytes[pos],
