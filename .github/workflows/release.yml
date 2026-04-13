@@ -13,8 +13,72 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  verify:
+    name: Verify tag and run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Verify tag matches workspace version
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          CARGO_VERSION=$(awk -F'"' '/^version = / {print $2; exit}' Cargo.toml)
+          echo "tag: $TAG_VERSION, Cargo.toml: $CARGO_VERSION"
+          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match workspace version ($CARGO_VERSION)"
+            exit 1
+          fi
+
+      - name: Run tests
+        run: cargo test --workspace
+
+  publish-crates:
+    name: Publish to crates.io
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Publish all crates in dependency order
+        uses: katyo/publish-crates@v2
+        with:
+          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          no-verify: false
+          ignore-unpublished-changes: true
+
+  generate-docs:
+    name: Generate completions and man pages
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build cabalist-cli
+        run: cargo build --release --bin cabalist-cli
+
+      - name: Generate artifacts
+        run: |
+          mkdir -p docs/completions docs/man
+          for shell in bash zsh fish; do
+            ./target/release/cabalist-cli completions "$shell" > "docs/completions/cabalist-cli.$shell"
+          done
+          ./target/release/cabalist-cli manpages docs/man
+
+      - name: Upload docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shell-docs
+          path: docs
+
+  build-binaries:
     name: Build ${{ matrix.target }}
+    needs: [verify, generate-docs]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -53,21 +117,16 @@ jobs:
 
       - name: Install musl tools
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }} --bins
 
-      - name: Generate shell completions and man pages
-        if: runner.os != 'Windows'
-        run: |
-          mkdir -p completions man
-          for shell in bash zsh fish; do
-            cargo run --release --target ${{ matrix.target }} --bin cabalist-cli -- completions "$shell" > "completions/cabalist-cli.$shell"
-          done
-          cargo run --release --target ${{ matrix.target }} --bin cabalist-cli -- manpages man
+      - name: Download completions and man pages
+        uses: actions/download-artifact@v4
+        with:
+          name: shell-docs
+          path: shell-docs
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
@@ -75,8 +134,9 @@ jobs:
           mkdir -p dist
           cp target/${{ matrix.target }}/release/cabalist dist/ || true
           cp target/${{ matrix.target }}/release/cabalist-cli dist/ || true
-          cp -r completions dist/
-          cp -r man dist/
+          cp target/${{ matrix.target }}/release/cabalist-lsp dist/ || true
+          cp -r shell-docs/completions dist/
+          cp -r shell-docs/man dist/
           cd dist
           tar czf ../cabalist-${{ github.ref_name }}-${{ matrix.target }}.tar.gz *
 
@@ -84,9 +144,12 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item "target/${{ matrix.target }}/release/cabalist.exe" -Destination "dist/" -ErrorAction SilentlyContinue
           Copy-Item "target/${{ matrix.target }}/release/cabalist-cli.exe" -Destination "dist/" -ErrorAction SilentlyContinue
+          Copy-Item "target/${{ matrix.target }}/release/cabalist-lsp.exe" -Destination "dist/" -ErrorAction SilentlyContinue
+          Copy-Item -Recurse "shell-docs/completions" -Destination "dist/"
+          Copy-Item -Recurse "shell-docs/man" -Destination "dist/"
           Compress-Archive -Path "dist/*" -DestinationPath "cabalist-${{ github.ref_name }}-${{ matrix.target }}.zip"
 
       - name: Generate checksums (Unix)
@@ -103,7 +166,7 @@ jobs:
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
         with:
-          artifact-name: sbom-${{ matrix.target }}.spdx.json
+          artifact-name: cabalist-${{ github.ref_name }}-${{ matrix.target }}.sbom.spdx.json
           output-file: cabalist-${{ github.ref_name }}-${{ matrix.target }}.sbom.spdx.json
 
       - name: Upload artifact
@@ -116,9 +179,43 @@ jobs:
             cabalist-*.sha256
             cabalist-*.sbom.spdx.json
 
+  package-vscode:
+    name: Package VS Code Extension
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Package extension
+        run: npx @vscode/vsce package --no-dependencies
+
+      - name: Publish to VS Code Marketplace
+        if: env.VSCE_TOKEN != ''
+        run: npx @vscode/vsce publish --no-dependencies -p "$VSCE_TOKEN"
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cabalist-vscode
+          path: editors/vscode/*.vsix
+
   release:
-    name: Create Release
-    needs: build
+    name: Create GitHub Release
+    needs: [build-binaries, package-vscode]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -134,7 +231,10 @@ jobs:
       - name: Sign release artifacts
         run: |
           for file in artifacts/**/*.tar.gz artifacts/**/*.zip; do
-            [ -f "$file" ] && cosign sign-blob --yes --output-signature "${file}.sig" --output-certificate "${file}.pem" "$file"
+            [ -f "$file" ] && cosign sign-blob --yes \
+              --output-signature "${file}.sig" \
+              --output-certificate "${file}.pem" \
+              "$file"
           done
 
       - name: Create GitHub Release
@@ -148,3 +248,4 @@ jobs:
             artifacts/**/*.sbom.spdx.json
             artifacts/**/*.sig
             artifacts/**/*.pem
+            artifacts/cabalist-vscode/*.vsix

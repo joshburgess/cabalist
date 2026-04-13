@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2026-04-12
 
 ### Added
 
@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Opinions**: 16 opinionated lints (version bounds, documentation, structure, build, flags, filesystem)
 - **Opinions**: Configurable via `cabalist.toml` with hierarchical overrides (project > user > defaults)
 - **Opinions**: 4 project templates (library, application, lib-and-exe, full)
-- **GHC**: 200+ GHC extensions with metadata (description, safety, since-version, category)
+- **GHC**: 119 GHC extensions with metadata (description, safety, since-version, category)
 - **GHC**: GHC warnings database with group membership
 - **Hackage**: Package index download, caching, and search
 - **Hackage**: PVP-compliant version bound computation
@@ -41,7 +41,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Project**: `cabal.project` file parser
 - **Testing**: 621+ tests including real-world corpus of 100 `.cabal` files
 - **CI**: Cross-platform GitHub Actions (Linux, macOS, Windows) with MSRV 1.88
-
-## [0.1.0] - Unreleased
-
-Initial release.
