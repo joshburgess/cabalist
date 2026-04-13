@@ -66,10 +66,10 @@
 
   <!-- Three tool badges -->
   <g font-family="'SF Mono', 'Cascadia Code', 'Fira Code', monospace" font-size="10" letter-spacing="1">
-    <text x="350" y="158" fill="#5BCAF9" text-anchor="middle" opacity="0.7">TUI</text>
-    <text x="390" y="158" fill="#555" text-anchor="middle">|</text>
-    <text x="430" y="158" fill="#5BCAF9" text-anchor="middle" opacity="0.7">CLI</text>
-    <text x="470" y="158" fill="#555" text-anchor="middle">|</text>
-    <text x="510" y="158" fill="#5BCAF9" text-anchor="middle" opacity="0.7">LSP</text>
+    <text x="330" y="158" fill="#5BCAF9" text-anchor="middle" opacity="0.7">TUI</text>
+    <text x="370" y="158" fill="#555" text-anchor="middle">|</text>
+    <text x="410" y="158" fill="#5BCAF9" text-anchor="middle" opacity="0.7">CLI</text>
+    <text x="450" y="158" fill="#555" text-anchor="middle">|</text>
+    <text x="490" y="158" fill="#5BCAF9" text-anchor="middle" opacity="0.7">LSP</text>
   </g>
 </svg>
